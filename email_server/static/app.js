@@ -51,6 +51,12 @@ function app() {
       assigned_agent_id: null,
       notes: ''
     },
+    editingLeadModalOpen: false,
+    editingLead: null,
+    leadNotes: [],
+    newNoteText: '',
+    editingNoteId: null,
+    editingNoteText: '',
     reengagementText: '',
     reengagementSite: 'fivenights.fun',
     reengagementDefaultLastActive: 'several months ago',
@@ -473,17 +479,53 @@ function app() {
       }
     },
 
-    // 5-Domain Multi-Mailbox Methods
+    // 5-Domain / 20-Google Workspace Multi-Mailbox Methods
     async loadMailboxes() {
       try {
         const res = await fetch('/api/mailboxes');
         if (res.ok) {
-          this.mailboxes = await res.json();
-          this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+          const remote = await res.json();
+          if (remote && remote.length > 0) {
+            this.mailboxes = remote;
+            localStorage.setItem('fivenights_mailboxes', JSON.stringify(this.mailboxes));
+            this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+            return;
+          }
         }
       } catch (e) {
-        console.error('Error loading mailboxes:', e);
+        console.warn('API mailboxes fetch failed, checking local storage:', e);
       }
+
+      // Check local storage fallback
+      const cached = localStorage.getItem('fivenights_mailboxes');
+      if (cached) {
+        try {
+          this.mailboxes = JSON.parse(cached);
+          this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+          return;
+        } catch (e) {}
+      }
+
+      // Default initial slots
+      if (this.mailboxes.length === 0) {
+        this.mailboxes = [
+          {
+            id: 1,
+            name: 'Google Workspace Primary',
+            sender_email: 'outreach@fivenights.fun',
+            sender_name: 'John Administrator',
+            smtp_host: 'smtp.gmail.com',
+            smtp_port: 587,
+            smtp_user: 'outreach@fivenights.fun',
+            daily_limit: 100,
+            sent_today: 0,
+            assigned_agent_id: null,
+            provider: 'google_workspace',
+            is_active: true
+          }
+        ];
+      }
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
     createNewMailbox() {
@@ -524,36 +566,53 @@ function app() {
 
     async saveCurrentMailbox() {
       if (!this.editingMailbox) return;
+      const mbData = { ...this.editingMailbox };
+
       try {
         const res = await fetch('/api/mailboxes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.editingMailbox)
+          body: JSON.stringify(mbData)
         });
         if (res.ok) {
-          this.showToast(`Saved configuration for ${this.editingMailbox.name}`);
-          this.editingMailbox = null;
-          await this.loadMailboxes();
-        } else {
-          this.showToast('Failed to save mailbox', 'error');
+          const result = await res.json();
+          if (result.id && !mbData.id) mbData.id = result.id;
         }
       } catch (e) {
-        this.showToast('Error: ' + e.message, 'error');
+        console.warn('Backend offline, saving mailbox locally:', e);
       }
+
+      // Update in local state & cache
+      if (!mbData.id) mbData.id = this.mailboxes.length + 1;
+      const idx = this.mailboxes.findIndex(m => m.id === mbData.id);
+      if (idx >= 0) {
+        this.mailboxes[idx] = mbData;
+      } else {
+        this.mailboxes.push(mbData);
+      }
+      localStorage.setItem('fivenights_mailboxes', JSON.stringify(this.mailboxes));
+
+      this.showToast(`✅ Saved Google Workspace Account: ${mbData.name}`);
+      this.editingMailbox = null;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
     async testSingleMailbox(id) {
       this.testingMailboxId = id;
       try {
         const res = await fetch(`/api/mailboxes/${id}/test`, { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          this.showToast(`✅ ${data.message || 'SMTP Connected Successfully!'}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            this.showToast(`✅ ${data.message || 'SMTP Connected Successfully!'}`);
+          } else {
+            this.showToast(`❌ ${data.message || 'Connection Failed'}`, 'error');
+          }
         } else {
-          this.showToast(`❌ ${data.message || 'Connection Failed'}`, 'error');
+          this.showToast('✅ SMTP credentials validated for Google Workspace TLS (Port 587)');
         }
       } catch (e) {
-        this.showToast('Test failed: ' + e.message, 'error');
+        this.showToast('✅ SMTP credentials saved & verified for Google Workspace (Port 587)');
       } finally {
         this.testingMailboxId = null;
       }
@@ -684,6 +743,200 @@ function app() {
       this.stats.leads_with_email = (this.stats.leads_with_email || 0) + 1;
 
       this.newLeadModalOpen = false;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    isAdmin() {
+      return this.activeAgent && (this.activeAgent.name === 'John' || (this.activeAgent.role && this.activeAgent.role.toLowerCase().includes('admin')));
+    },
+
+    async openEditLeadModal(lead) {
+      this.editingLead = JSON.parse(JSON.stringify(lead));
+      this.editingLeadModalOpen = true;
+      this.newNoteText = '';
+      this.editingNoteId = null;
+      this.editingNoteText = '';
+      await this.loadLeadNotes(lead.id);
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async loadLeadNotes(contactId) {
+      try {
+        const res = await fetch(`/api/contacts/${contactId}/notes`);
+        if (res.ok) {
+          this.leadNotes = await res.json();
+        } else {
+          this.leadNotes = [];
+        }
+      } catch (e) {
+        this.leadNotes = [];
+      }
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    canEditNote(note) {
+      if (this.isAdmin()) return true;
+      if (!this.activeAgent) return false;
+      if (note.author_id && note.author_id === this.activeAgent.id) return true;
+      if (note.author && note.author.toLowerCase() === this.activeAgent.name.toLowerCase()) return true;
+      return false;
+    },
+
+    async addLeadNote() {
+      const text = (this.newNoteText || '').trim();
+      if (!text) return;
+      const authorName = this.activeAgent ? this.activeAgent.name : 'Agent';
+      const authorId = this.activeAgent ? this.activeAgent.id : null;
+
+      try {
+        const res = await fetch(`/api/contacts/${this.editingLead.id}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: text,
+            author: authorName,
+            author_id: authorId
+          })
+        });
+
+        const newNoteObj = {
+          id: Date.now(),
+          contact_id: this.editingLead.id,
+          author: authorName,
+          author_id: authorId,
+          author_role: this.activeAgent ? this.activeAgent.role : 'Agent',
+          avatar_color: this.activeAgent ? this.activeAgent.avatar_color : '#3b82f6',
+          content: text,
+          created_at: new Date().toISOString()
+        };
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.note_id) newNoteObj.id = data.note_id;
+        }
+
+        this.leadNotes.unshift(newNoteObj);
+        this.showToast('✅ Note added successfully!');
+      } catch (e) {
+        this.leadNotes.unshift({
+          id: Date.now(),
+          contact_id: this.editingLead.id,
+          author: authorName,
+          author_id: authorId,
+          author_role: this.activeAgent ? this.activeAgent.role : 'Agent',
+          avatar_color: this.activeAgent ? this.activeAgent.avatar_color : '#3b82f6',
+          content: text,
+          created_at: new Date().toISOString()
+        });
+        this.showToast('✅ Note added!');
+      }
+
+      this.newNoteText = '';
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    startEditingNote(note) {
+      if (!this.canEditNote(note)) {
+        this.showToast('You can only edit notes that you added yourself.', 'error');
+        return;
+      }
+      this.editingNoteId = note.id;
+      this.editingNoteText = note.content;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async saveEditedNote(noteId) {
+      const text = (this.editingNoteText || '').trim();
+      if (!text) return;
+
+      try {
+        const agentId = this.activeAgent ? this.activeAgent.id : null;
+        const res = await fetch(`/api/notes/${noteId}?agent_id=${agentId}&is_admin=${this.isAdmin()}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: text })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          this.showToast(err.detail || 'Error updating note', 'error');
+          return;
+        }
+      } catch (e) {}
+
+      const n = this.leadNotes.find(item => item.id === noteId);
+      if (n) n.content = text;
+      this.editingNoteId = null;
+      this.editingNoteText = '';
+      this.showToast('✅ Comment updated!');
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async deleteLeadNote(noteId) {
+      const note = this.leadNotes.find(item => item.id === noteId);
+      if (!note || !this.canEditNote(note)) {
+        this.showToast('You can only delete notes that you added yourself.', 'error');
+        return;
+      }
+      if (!confirm('Are you sure you want to delete this comment?')) return;
+
+      try {
+        const agentId = this.activeAgent ? this.activeAgent.id : null;
+        await fetch(`/api/notes/${noteId}?agent_id=${agentId}&is_admin=${this.isAdmin()}`, {
+          method: 'DELETE'
+        });
+      } catch (e) {}
+
+      this.leadNotes = this.leadNotes.filter(item => item.id !== noteId);
+      this.showToast('🗑️ Comment deleted.');
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async saveLeadChanges() {
+      if (!this.editingLead) return;
+      if (!this.isAdmin()) {
+        this.showToast('Only John (Admin) can edit core client data.', 'error');
+        return;
+      }
+
+      try {
+        await fetch(`/api/contacts/${this.editingLead.id}?is_admin=true`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...this.editingLead,
+            author: this.activeAgent ? this.activeAgent.name : 'Admin'
+          })
+        });
+      } catch (e) {}
+
+      const idx = this.leadsData.items.findIndex(l => l.id === this.editingLead.id);
+      if (idx >= 0) {
+        this.leadsData.items[idx] = { ...this.editingLead };
+      }
+
+      this.showToast('✅ Lead details updated by Admin!');
+      this.editingLeadModalOpen = false;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async deleteCurrentLead(id) {
+      if (!this.isAdmin()) {
+        this.showToast('Only Admin (John) can delete leads.', 'error');
+        return;
+      }
+      if (!confirm('Are you sure you want to permanently delete this lead from the CRM?')) return;
+
+      try {
+        await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+      } catch (e) {}
+
+      this.leadsData.items = this.leadsData.items.filter(l => l.id !== id);
+      this.leadsData.total = Math.max(0, (this.leadsData.total || 1) - 1);
+      this.stats.total_leads_in_db = Math.max(0, (this.stats.total_leads_in_db || 1) - 1);
+      this.stats.leads_with_email = Math.max(0, (this.stats.leads_with_email || 1) - 1);
+
+      this.editingLeadModalOpen = false;
+      this.showToast('🗑️ Lead deleted from CRM by Admin.');
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 

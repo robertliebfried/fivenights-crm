@@ -143,11 +143,17 @@ async def init_crm_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 contact_id INTEGER NOT NULL,
                 author TEXT DEFAULT 'You',
+                author_id INTEGER DEFAULT NULL,
                 content TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
             );
         """)
+
+        try:
+            await db.execute("ALTER TABLE contact_notes ADD COLUMN author_id INTEGER DEFAULT NULL")
+        except Exception:
+            pass
 
         # 7. Multi-Mailbox Accounts (Google Workspace & Custom SMTP)
         await db.execute("""
@@ -340,14 +346,61 @@ async def update_contact_stage(contact_id: int, new_stage_id: int):
         """, (new_stage_id, contact_id))
         await db.commit()
 
-async def add_contact_note(contact_id: int, content: str, author: str = "You"):
+async def get_contact_notes(contact_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
-            INSERT INTO contact_notes (contact_id, author, content)
-            VALUES (?, ?, ?)
-        """, (contact_id, author, content))
-        await db.execute("UPDATE contacts SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (contact_id,))
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT n.*, a.avatar_color, a.role as author_role
+            FROM contact_notes n
+            LEFT JOIN agents a ON n.author_id = a.id
+            WHERE n.contact_id = ?
+            ORDER BY n.id DESC
+        """, (contact_id,)) as cursor:
+            return [dict(r) for r in await cursor.fetchall()]
+
+async def add_contact_note(contact_id: int, content: str, author: str = "You", author_id: int = None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("""
+            INSERT INTO contact_notes (contact_id, author, author_id, content)
+            VALUES (?, ?, ?, ?)
+        """, (contact_id, author, author_id, content))
+        await db.execute("UPDATE contacts SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (content, contact_id))
         await db.commit()
+        return cursor.lastrowid
+
+async def update_contact_note(note_id: int, content: str, agent_id: int = None, is_admin: bool = False):
+    """Admin can edit any note; agent can only edit notes that they added themselves"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM contact_notes WHERE id = ?", (note_id,)) as cursor:
+            note = await cursor.fetchone()
+            if not note:
+                return False, "Note not found"
+            note_dict = dict(note)
+            if not is_admin:
+                if note_dict.get('author_id') and agent_id and note_dict['author_id'] != agent_id:
+                    return False, "Agents can only edit notes that they added themselves."
+
+        await db.execute("UPDATE contact_notes SET content = ? WHERE id = ?", (content, note_id))
+        await db.commit()
+        return True, "Note updated"
+
+async def delete_contact_note(note_id: int, agent_id: int = None, is_admin: bool = False):
+    """Admin can delete any note; agent can only delete notes that they added themselves"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM contact_notes WHERE id = ?", (note_id,)) as cursor:
+            note = await cursor.fetchone()
+            if not note:
+                return False, "Note not found"
+            note_dict = dict(note)
+            if not is_admin:
+                if note_dict.get('author_id') and agent_id and note_dict['author_id'] != agent_id:
+                    return False, "Agents can only delete notes that they added themselves."
+
+        await db.execute("DELETE FROM contact_notes WHERE id = ?", (note_id,))
+        await db.commit()
+        return True, "Note deleted"
 
 async def create_single_contact(data: dict):
     """Manually add a single lead/contact by an agent or admin"""
@@ -387,6 +440,66 @@ async def create_single_contact(data: dict):
         """, (company, name, email, phone, country, city, stage_id, deal_value, notes, tags, assigned_agent_id))
         await db.commit()
         return cursor.lastrowid
+
+async def update_contact(contact_id: int, data: dict, is_admin: bool = False):
+    """Update contact: Admin can edit everything; Agents can only edit notes/comments"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        notes = (data.get("notes") or "").strip()
+        author = data.get("author", "Agent")
+
+        if is_admin:
+            name = (data.get("contact_person") or data.get("name") or "").strip()
+            company = (data.get("company_name") or data.get("company") or "").strip()
+            email = (data.get("email") or "").strip()
+            phone = (data.get("phone") or "").strip()
+            country = (data.get("country") or "").strip()
+            city = (data.get("city") or "").strip()
+            raw_agent = data.get("assigned_agent_id")
+            if raw_agent in ("", "none", 0, "0", None):
+                assigned_agent_id = None
+            else:
+                try:
+                    assigned_agent_id = int(raw_agent)
+                except (ValueError, TypeError):
+                    assigned_agent_id = None
+
+            await db.execute("""
+                UPDATE contacts SET
+                    company_name = ?,
+                    contact_person = ?,
+                    email = ?,
+                    phone = ?,
+                    country = ?,
+                    city = ?,
+                    notes = ?,
+                    assigned_agent_id = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (company, name, email, phone, country, city, notes, assigned_agent_id, contact_id))
+        else:
+            # Agents can only update comments / notes
+            await db.execute("""
+                UPDATE contacts SET
+                    notes = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (notes, contact_id))
+
+        if notes:
+            await db.execute("""
+                INSERT INTO contact_notes (contact_id, author, content)
+                VALUES (?, ?, ?)
+            """, (contact_id, author, notes))
+
+        await db.commit()
+        return True
+
+async def delete_contact(contact_id: int):
+    """Delete a contact from CRM (Admin only)"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
+        await db.commit()
+        return True
 
 async def import_leads_to_crm(leads: list, target_stage_id: int = 1):
     async with aiosqlite.connect(DB_PATH) as db:

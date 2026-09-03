@@ -16,7 +16,9 @@ from email_server.crm_database import (
     init_crm_db, get_all_mailboxes, get_mailbox_by_id,
     save_mailbox, delete_mailbox, import_reengagement_clients,
     get_all_agents, get_agent_by_id, save_agent, delete_agent,
-    import_contacts_from_csv_list, create_single_contact
+    import_contacts_from_csv_list, create_single_contact,
+    update_contact, delete_contact,
+    get_contact_notes, add_contact_note, update_contact_note, delete_contact_note
 )
 from email_server.leads_loader import (
     get_loaded_leads, search_leads, get_countries_summary,
@@ -352,6 +354,50 @@ async def import_contacts_csv_api(payload: CSVImportModel):
 async def create_single_contact_api(payload: SingleContactModel):
     contact_id = await create_single_contact(payload.model_dump())
     return {"success": True, "contact_id": contact_id}
+
+# Contact Update Route (Admin: all fields; Agent: notes/comments only)
+@app.put("/api/contacts/{contact_id}")
+async def update_contact_api(contact_id: int, payload: dict, is_admin: bool = False):
+    res = await update_contact(contact_id, payload, is_admin=is_admin)
+    return {"success": res}
+
+# Contact Delete Route (Admin only)
+@app.delete("/api/contacts/{contact_id}")
+async def delete_contact_api(contact_id: int):
+    res = await delete_contact(contact_id)
+    return {"success": res}
+
+# Contact Notes & Comments Routes (Enforcing: agent can edit only notes he added)
+@app.get("/api/contacts/{contact_id}/notes")
+async def get_contact_notes_api(contact_id: int):
+    return await get_contact_notes(contact_id)
+
+@app.post("/api/contacts/{contact_id}/notes")
+async def add_contact_note_api(contact_id: int, payload: dict):
+    content = payload.get("content", "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Note content cannot be empty")
+    author = payload.get("author", "Agent")
+    author_id = payload.get("author_id")
+    note_id = await add_contact_note(contact_id, content, author=author, author_id=author_id)
+    return {"success": True, "note_id": note_id}
+
+@app.put("/api/notes/{note_id}")
+async def update_contact_note_api(note_id: int, payload: dict, agent_id: Optional[int] = None, is_admin: bool = False):
+    content = payload.get("content", "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Note content cannot be empty")
+    ok, msg = await update_contact_note(note_id, content, agent_id=agent_id, is_admin=is_admin)
+    if not ok:
+        raise HTTPException(status_code=403, detail=msg)
+    return {"success": True, "message": msg}
+
+@app.delete("/api/notes/{note_id}")
+async def delete_contact_note_api(note_id: int, agent_id: Optional[int] = None, is_admin: bool = False):
+    ok, msg = await delete_contact_note(note_id, agent_id=agent_id, is_admin=is_admin)
+    if not ok:
+        raise HTTPException(status_code=403, detail=msg)
+    return {"success": True, "message": msg}
 
 # Team Agents API Routes (Max, Fred, Chriss)
 @app.get("/api/agents")
