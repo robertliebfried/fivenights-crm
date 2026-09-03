@@ -66,6 +66,15 @@ function app() {
     },
 
     async initApp() {
+      // Hardcoded fallback agents (work without backend API)
+      const FALLBACK_AGENTS = [
+        { id: 1, name: 'John',  email: 'john@fivenights.fun',  role: 'System Administrator & Managing Director', avatar_color: '#ef4444', signature: 'Best regards,\nJohn\nAdministrator • FiveNights.fun\njohn@fivenights.fun',  is_active: 1 },
+        { id: 2, name: 'Max',   email: 'max@fivenights.fun',   role: 'Senior Outreach & Lead Account Executive',  avatar_color: '#3b82f6', signature: 'Best regards,\nMax\nOutreach Specialist • FiveNights.fun\nmax@fivenights.fun',   is_active: 1 },
+        { id: 3, name: 'Fred',  email: 'fred@fivenights.fun',  role: 'Client Relations & Win-Back Manager',        avatar_color: '#10b981', signature: 'Best regards,\nFred\nClient Success Manager • FiveNights.fun\nfred@fivenights.fun',  is_active: 1 },
+        { id: 4, name: 'Chriss',email: 'chriss@fivenights.fun',role: 'Portfolio & Account Specialist',             avatar_color: '#8b5cf6', signature: 'Best regards,\nChriss\nAccount Specialist • FiveNights.fun\nchriss@fivenights.fun', is_active: 1 }
+      ];
+      this.agents = FALLBACK_AGENTS;
+
       // Check saved authentication
       const savedAuth = localStorage.getItem('fivenights_agent_auth');
       if (savedAuth) {
@@ -76,14 +85,18 @@ function app() {
         } catch (e) {}
       }
 
-      await this.loadStats();
-      await this.loadSettings();
-      await this.loadAgents();
-      await this.loadMailboxes();
-      await this.loadTemplates();
-      await this.loadLeads(1);
-      await this.loadCampaigns();
-      await this.loadLogs();
+      // Render icons immediately so login screen looks correct
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+
+      // Load backend data in background (only if API available)
+      this.loadStats().catch(() => {});
+      this.loadSettings().catch(() => {});
+      this.loadAgents().catch(() => {});
+      this.loadMailboxes().catch(() => {});
+      this.loadTemplates().catch(() => {});
+      this.loadLeads(1).catch(() => {});
+      this.loadCampaigns().catch(() => {});
+      this.loadLogs().catch(() => {});
 
       // Periodic auto-refresh for logs & active campaigns every 5s
       setInterval(() => {

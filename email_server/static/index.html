@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Outreach & Email Dispatch Server — Cold Email Platform</title>
+  <title>FiveNights.fun CRM — Agent Portal</title>
   <!-- Tailwind CSS, Alpine.js & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="app.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="style.css">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -24,6 +25,10 @@
       }
     }
   </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    body { background-color: #070d18; }
+  </style>
 </head>
 <body class="bg-[#0b1120] text-slate-100 min-h-screen flex flex-col antialiased" x-data="app()" x-init="initApp()">
 
@@ -1102,12 +1107,11 @@
     </div>
 
   </main>
-
-  <script src="/static/app.js"></script>
+ 
   <script>
     // Initialize Lucide icons on load
     document.addEventListener("DOMContentLoaded", () => {
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     });
   </script>
 </body>
