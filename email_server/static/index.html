@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Outreach & Email Dispatch Server — Cold Email Platform</title>
+  <!-- Tailwind CSS, Alpine.js & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#2563eb',
+            darkbg: '#0b1120',
+            cardbg: '#1e293b',
+            bordercol: '#334155'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#0b1120] text-slate-100 min-h-screen flex flex-col antialiased" x-data="app()" x-init="initApp()">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-[#131d31] border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i data-lucide="mail-check" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-white flex items-center gap-2">
+            FiveNights.fun CRM
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="settings.dry_run_mode ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'">
+              <span class="inline-block w-1.5 h-1.5 rounded-full mr-1" :class="settings.dry_run_mode ? 'bg-amber-400' : 'bg-emerald-400'"></span>
+              <span x-text="settings.dry_run_mode ? 'DRY-RUN SIMULATION' : 'LIVE 5-DOMAIN DISPATCH'"></span>
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">Internal CRM & 5-Domain Multi-SMTP Dispatch Hub</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex space-x-1 bg-slate-900/60 p-1 rounded-lg border border-slate-800">
+        <button @click="currentTab = 'overview'" :class="currentTab === 'overview' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview
+        </button>
+        <button @click="currentTab = 'domains'" :class="currentTab === 'domains' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="globe" class="w-4 h-4 text-emerald-400"></i> 5 Domains (SMTP)
+        </button>
+        <button @click="currentTab = 'reengagement'" :class="currentTab === 'reengagement' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="user-check" class="w-4 h-4 text-amber-400"></i> Inactive Clients
+        </button>
+        <button @click="currentTab = 'agents'" :class="currentTab === 'agents' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="shield-check" class="w-4 h-4 text-purple-400"></i> Agents (3)
+        </button>
+        <button @click="currentTab = 'leads'" :class="currentTab === 'leads' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="users" class="w-4 h-4"></i> Leads
+        </button>
+        <button @click="currentTab = 'campaigns'" :class="currentTab === 'campaigns' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="mail" class="w-4 h-4"></i> Campaigns
+        </button>
+        <button @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="settings" class="w-4 h-4"></i> Global SMTP
+        </button>
+        <button @click="currentTab = 'logs'" :class="currentTab === 'logs' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition">
+          <i data-lucide="list-ordered" class="w-4 h-4"></i> Logs
+        </button>
+      </nav>
+
+      <!-- Active Agent Switcher Badge & Logout -->
+      <div class="hidden lg:flex items-center gap-3 pl-3 border-l border-slate-800">
+        <template x-if="isAuthenticated && activeAgent">
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 cursor-pointer hover:border-slate-700 transition"
+                 @click="currentTab = 'agents'">
+              <div class="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                   :style="'background-color: ' + (activeAgent.avatar_color || '#3b82f6')"
+                   x-text="activeAgent.name.charAt(0)"></div>
+              <div class="text-left">
+                <span class="block text-xs font-bold text-white leading-tight" x-text="activeAgent.name"></span>
+                <span class="block text-[10px] leading-none" :class="activeAgent.name === 'John' ? 'text-rose-400 font-semibold' : 'text-emerald-400'" x-text="activeAgent.name === 'John' ? 'Administrator' : 'Active Agent'"></span>
+              </div>
+            </div>
+            <button type="button" @click="logoutAgent()" title="Sign out" class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-900/50 transition">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </template>
+        <template x-if="!isAuthenticated">
+          <button type="button" @click="loginForm.error = ''" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 transition">
+            <i data-lucide="log-in" class="w-3.5 h-3.5"></i> Agent Login
+          </button>
+        </template>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Toast -->
+  <div x-show="toast.visible" x-transition class="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg shadow-xl border text-sm flex items-center gap-3" :class="toast.type === 'error' ? 'bg-red-950 border-red-800 text-red-200' : 'bg-emerald-950 border-emerald-800 text-emerald-200'" style="display: none;">
+    <i data-lucide="info" class="w-5 h-5"></i>
+    <span x-text="toast.message"></span>
+    <button @click="toast.visible = false" class="ml-2 text-slate-400 hover:text-white">&times;</button>
+  </div>
+
+  <!-- ================= AGENT AUTHENTICATION GATE ================= -->
+  <div x-show="!isAuthenticated" class="fixed inset-0 z-50 bg-[#070d18] flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-[#131d31] border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto shadow-xl shadow-indigo-500/20">
+          <i data-lucide="lock" class="w-7 h-7 text-white"></i>
+        </div>
+        <h2 class="text-xl font-bold text-white tracking-wide">FiveNights.fun CRM</h2>
+        <p class="text-xs text-slate-400">Agent & Admin Portal — Sign in to access the 5-Domain Multi-SMTP Dispatch Server.</p>
+      </div>
+
+      <!-- Quick Account Selector Buttons -->
+      <div class="space-y-2">
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">Select Your Profile:</span>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" @click="quickSelectAgent('John')" class="p-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-rose-500/60 text-left flex items-center gap-2.5 transition group">
+            <div class="w-7 h-7 rounded-lg bg-rose-500 text-white font-bold flex items-center justify-center text-xs">J</div>
+            <div class="min-w-0">
+              <span class="block text-xs font-bold text-white group-hover:text-rose-400 truncate">John (Admin)</span>
+              <span class="block text-[10px] text-slate-400 truncate">john@fivenights.fun</span>
+            </div>
+          </button>
+          <button type="button" @click="quickSelectAgent('Max')" class="p-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-blue-500/60 text-left flex items-center gap-2.5 transition group">
+            <div class="w-7 h-7 rounded-lg bg-blue-500 text-white font-bold flex items-center justify-center text-xs">M</div>
+            <div class="min-w-0">
+              <span class="block text-xs font-bold text-white group-hover:text-blue-400 truncate">Max</span>
+              <span class="block text-[10px] text-slate-400 truncate">max@fivenights.fun</span>
+            </div>
+          </button>
+          <button type="button" @click="quickSelectAgent('Fred')" class="p-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-emerald-500/60 text-left flex items-center gap-2.5 transition group">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500 text-white font-bold flex items-center justify-center text-xs">F</div>
+            <div class="min-w-0">
+              <span class="block text-xs font-bold text-white group-hover:text-emerald-400 truncate">Fred</span>
+              <span class="block text-[10px] text-slate-400 truncate">fred@fivenights.fun</span>
+            </div>
+          </button>
+          <button type="button" @click="quickSelectAgent('Chriss')" class="p-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-purple-500/60 text-left flex items-center gap-2.5 transition group">
+            <div class="w-7 h-7 rounded-lg bg-purple-500 text-white font-bold flex items-center justify-center text-xs">C</div>
+            <div class="min-w-0">
+              <span class="block text-xs font-bold text-white group-hover:text-purple-400 truncate">Chriss</span>
+              <span class="block text-[10px] text-slate-400 truncate">chriss@fivenights.fun</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="relative flex py-1 items-center">
+        <div class="flex-grow border-t border-slate-800"></div>
+        <span class="flex-shrink mx-3 text-slate-500 text-[10px] uppercase tracking-wider">or sign in manually</span>
+        <div class="flex-grow border-t border-slate-800"></div>
+      </div>
+
+      <form @submit.prevent="loginAgent()" class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-300 font-medium mb-1">Username / Email</label>
+          <input type="text" x-model="loginForm.username" placeholder="john@fivenights.fun, max, fred, or chriss" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500" required>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-300 font-medium mb-1">Password</label>
+          <input type="password" x-model="loginForm.password" placeholder="••••••" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500" required>
+        </div>
+
+        <div x-show="loginForm.error" class="p-3 bg-red-950/60 border border-red-800/80 rounded-xl text-xs text-red-300 flex items-center gap-2">
+          <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+          <span x-text="loginForm.error"></span>
+        </div>
+
+        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold tracking-wide uppercase shadow-lg shadow-indigo-500/25 transition">
+          Sign In to Portal &rarr;
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Content Body -->
+  <main x-show="isAuthenticated" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ================= TAB 1: OVERVIEW ================= -->
+    <div x-show="currentTab === 'overview'" class="space-y-6">
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Leads in DB</span>
+            <span class="p-2 rounded-lg bg-blue-500/10 text-blue-400"><i data-lucide="database" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-white" x-text="stats.total_leads_in_db || '15,974'"></span>
+            <span class="text-xs text-emerald-400" x-text="stats.leads_with_email + ' with email'"></span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">From 29 jurisdictions worldwide</p>
+        </div>
+
+        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Dispatched (Real)</span>
+            <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><i data-lucide="check-circle-2" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-white" x-text="stats.total_sent_real || 0"></span>
+            <span class="text-xs text-slate-400">Live emails sent</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">Delivered via SMTP</p>
+        </div>
+
+        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Dry-Run Simulations</span>
+            <span class="p-2 rounded-lg bg-amber-500/10 text-amber-400"><i data-lucide="flask-conical" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-white" x-text="stats.total_dry_run || 0"></span>
+            <span class="text-xs text-amber-400">Verified templates</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">Tested without sending real emails</p>
+        </div>
+
+        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Campaigns</span>
+            <span class="p-2 rounded-lg bg-purple-500/10 text-purple-400"><i data-lucide="play" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span class="text-2xl font-bold text-white" x-text="stats.total_campaigns || 0"></span>
+            <span class="text-xs text-purple-400">Created in system</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">With rate limiting & anti-spam</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Banner -->
+      <div class="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 p-6 rounded-xl border border-blue-800/40 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="space-y-1">
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="zap" class="w-5 h-5 text-amber-400"></i> Start Your High-Converting Pitch Campaign
+          </h2>
+          <p class="text-xs text-slate-300">
+            Target 888 licensed legal, claims, and crypto-forensic organizations without websites across the UK, Ireland, Australia, Germany, Switzerland, etc.
+          </p>
+        </div>
+        <div class="flex gap-3">
+          <button @click="currentTab = 'leads'" class="btn btn-secondary text-xs">
+            <i data-lucide="search" class="w-4 h-4"></i> Browse Leads
+          </button>
+          <button @click="currentTab = 'campaigns'" class="btn btn-primary text-xs shadow-lg shadow-blue-500/20">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i> Create Campaign
+          </button>
+        </div>
+      </div>
+
+      <!-- Recent Activity Feed -->
+      <div class="bg-[#131d31] rounded-xl border border-slate-800 overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            <i data-lucide="activity" class="w-4 h-4 text-blue-400"></i> Live Activity Feed
+          </h3>
+          <button @click="loadLogs()" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+          </button>
+        </div>
+        <div class="divide-y divide-slate-800/60 max-h-72 overflow-y-auto">
+          <template x-for="log in logs.slice(0, 10)" :key="log.id">
+            <div class="px-5 py-3 text-xs flex items-center justify-between hover:bg-slate-800/30">
+              <div class="flex items-center gap-3">
+                <span class="badge" :class="log.status === 'SENT' ? 'badge-green' : log.status === 'DRY_RUN_SUCCESS' ? 'badge-amber' : 'badge-red'" x-text="log.status"></span>
+                <div>
+                  <span class="font-medium text-white" x-text="log.company_name || log.recipient_email"></span>
+                  <span class="text-slate-400 ml-2" x-text="'<' + log.recipient_email + '>'"></span>
+                </div>
+              </div>
+              <div class="text-slate-500 text-[11px]" x-text="log.created_at"></div>
+            </div>
+          </template>
+          <div x-show="logs.length === 0" class="p-6 text-center text-xs text-slate-500">
+            No email dispatches yet. Create a campaign or send a test email!
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 2: LEADS EXPLORER ================= -->
+    <div x-show="currentTab === 'leads'" class="space-y-4">
+      <!-- Search and Filter Bar -->
+      <div class="bg-[#131d31] p-4 rounded-xl border border-slate-800 space-y-3">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <!-- Text Search -->
+          <div class="relative md:col-span-2">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+            <input type="text" x-model="leadsFilter.query" @input.debounce.300ms="loadLeads(1)" placeholder="Search company, email, regulator, city..." class="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+          </div>
+
+          <!-- Country Filter -->
+          <div>
+            <select x-model="leadsFilter.country" @change="loadLeads(1)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+              <option value="All">All Countries (29)</option>
+              <option value="Ireland">Ireland</option>
+              <option value="Australia">Australia</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Germany">Germany</option>
+              <option value="Switzerland">Switzerland</option>
+              <option value="Spain">Spain</option>
+              <option value="France">France</option>
+              <option value="Netherlands">Netherlands</option>
+              <option value="Luxembourg">Luxembourg</option>
+              <option value="United States">United States</option>
+              <option value="Denmark">Denmark</option>
+              <option value="Sweden">Sweden</option>
+              <option value="Norway">Norway</option>
+              <option value="Finland">Finland</option>
+              <option value="Austria">Austria</option>
+              <option value="Belgium">Belgium</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Hong Kong">Hong Kong</option>
+              <option value="Cyprus">Cyprus</option>
+              <option value="Malta">Malta</option>
+            </select>
+          </div>
+
+          <!-- Relevance Filter -->
+          <div>
+            <select x-model="leadsFilter.relevance" @change="loadLeads(1)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+              <option value="All">All Authorizations</option>
+              <option value="Legal representation / litigation possible">Legal / Litigation possible</option>
+              <option value="Claims handling / insurance claims authorization">Claims & Chargeback handling</option>
+              <option value="Crypto-asset services authorization">Crypto & VASP Services</option>
+              <option value="Forensic / investigative / asset-tracing service indicated">Forensic & Asset Tracing</option>
+              <option value="Financial or investment advice authorization">Financial & Investment Advice</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800 text-xs">
+          <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+              <input type="checkbox" x-model="leadsFilter.only_with_email" @change="loadLeads(1)" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0">
+              <span>Only show leads with valid email</span>
+            </label>
+            <span class="text-slate-500">|</span>
+            <span class="text-slate-400">Total matched: <strong class="text-white" x-text="leadsData.total"></strong></span>
+            <span class="text-slate-400">Selected for campaign: <strong class="text-blue-400" x-text="selectedLeads.length"></strong></span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button @click="selectAllOnPage()" class="btn btn-secondary text-xs py-1 px-2.5">Select Page</button>
+            <button @click="selectedLeads = []" class="btn btn-secondary text-xs py-1 px-2.5">Clear Selection</button>
+            <button @click="proceedToCampaignWithSelected()" :disabled="selectedLeads.length === 0" class="btn btn-primary text-xs py-1 px-3 disabled:opacity-50">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i> Launch Campaign (<span x-text="selectedLeads.length"></span>)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leads Table -->
+      <div class="bg-[#131d31] rounded-xl border border-slate-800 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-3 w-10 text-center"><input type="checkbox" @change="toggleAllPage($event)" class="rounded bg-slate-900 border-slate-700"></th>
+                <th class="p-3">Company Name</th>
+                <th class="p-3">Email Address</th>
+                <th class="p-3">Country</th>
+                <th class="p-3">Regulatory Capability</th>
+                <th class="p-3">Regulator & Licence</th>
+                <th class="p-3">Website Signal</th>
+                <th class="p-3 text-center">MX Check</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              <template x-for="lead in leadsData.items" :key="lead.id">
+                <tr class="hover:bg-slate-800/30 transition">
+                  <td class="p-3 text-center">
+                    <input type="checkbox" :value="lead" x-model="selectedLeads" class="rounded bg-slate-900 border-slate-700 text-blue-600">
+                  </td>
+                  <td class="p-3 font-semibold text-white">
+                    <div x-text="lead.company_name"></div>
+                    <div class="text-[10px] text-slate-500" x-text="lead.organization_type"></div>
+                  </td>
+                  <td class="p-3">
+                    <template x-if="lead.email">
+                      <span class="text-blue-300 font-mono" x-text="lead.email"></span>
+                    </template>
+                    <template x-if="!lead.email">
+                      <span class="text-slate-600 italic">No email listed in source</span>
+                    </template>
+                  </td>
+                  <td class="p-3" x-text="lead.country"></td>
+                  <td class="p-3">
+                    <span class="badge" :class="lead.relevance.includes('Legal') ? 'badge-blue' : lead.relevance.includes('Claims') ? 'badge-green' : lead.relevance.includes('Crypto') ? 'badge-amber' : 'badge-gray'" x-text="lead.relevance"></span>
+                  </td>
+                  <td class="p-3 text-slate-400">
+                    <div class="font-mono text-[11px]" x-text="lead.licence_number"></div>
+                    <div class="text-[10px] text-slate-500" x-text="lead.regulator"></div>
+                  </td>
+                  <td class="p-3">
+                    <span class="badge badge-amber text-[10px]" x-text="lead.website_status"></span>
+                  </td>
+                  <td class="p-3 text-center">
+                    <template x-if="lead.email">
+                      <button @click="verifyLeadEmail(lead)" class="text-slate-400 hover:text-blue-400" title="Check MX Records (Hunter style)">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i>
+                      </button>
+                    </template>
+                    <template x-if="!lead.email">
+                      <span class="text-slate-700">-</span>
+                    </template>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="px-5 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <div>
+            Showing page <span class="text-white font-medium" x-text="leadsData.page"></span> of <span class="text-white font-medium" x-text="leadsData.total_pages"></span>
+          </div>
+          <div class="flex gap-2">
+            <button @click="loadLeads(leadsData.page - 1)" :disabled="leadsData.page <= 1" class="btn btn-secondary text-xs py-1 px-3 disabled:opacity-40">Previous</button>
+            <button @click="loadLeads(leadsData.page + 1)" :disabled="leadsData.page >= leadsData.total_pages" class="btn btn-secondary text-xs py-1 px-3 disabled:opacity-40">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 3: CAMPAIGN BUILDER ================= -->
+    <div x-show="currentTab === 'campaigns'" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Editor Panel -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="edit" class="w-4 h-4 text-blue-400"></i> Compose Campaign Pitch
+              </h2>
+              <span class="text-xs text-slate-400">Recipients selected: <strong class="text-blue-400" x-text="campaignForm.leads.length"></strong></span>
+            </div>
+
+            <!-- Campaign Name -->
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Campaign Name</label>
+              <input type="text" x-model="campaignForm.name" placeholder="e.g. UK & Irish Solicitors Web Pitch 2026" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            </div>
+
+            <!-- Template Preset Selector -->
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Select Preset Pitch Template</label>
+              <select @change="applyTemplatePreset($event.target.value)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+                <option value="">-- Choose High-Converting Template --</option>
+                <template x-for="t in templates" :key="t.id">
+                  <option :value="t.id" x-text="t.name + ' (' + t.category + ')'"></option>
+                </template>
+              </select>
+            </div>
+
+            <!-- Variable Insertion Tags -->
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1.5">Insert Dynamic Personalization Tags (Click to copy/insert):</label>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" @click="insertTag('{{company_name}}')" class="tag-btn">{{company_name}}</button>
+                <button type="button" @click="insertTag('{{country}}')" class="tag-btn">{{country}}</button>
+                <button type="button" @click="insertTag('{{regulator}}')" class="tag-btn">{{regulator}}</button>
+                <button type="button" @click="insertTag('{{licence_number}}')" class="tag-btn">{{licence_number}}</button>
+                <button type="button" @click="insertTag('{{city}}')" class="tag-btn">{{city}}</button>
+                <button type="button" @click="insertTag('{{sender_name}}')" class="tag-btn">{{sender_name}}</button>
+                <button type="button" @click="insertTag('{{sender_email}}')" class="tag-btn">{{sender_email}}</button>
+              </div>
+            </div>
+
+            <!-- Subject Line -->
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Email Subject Line</label>
+              <input type="text" x-model="campaignForm.custom_subject" placeholder="e.g. Digital presence & client intake portal for {{company_name}}" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500">
+            </div>
+
+            <!-- HTML Body -->
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Email Body (HTML / Rich Text)</label>
+              <textarea x-model="campaignForm.custom_body_html" rows="10" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" placeholder="<p>Dear {{company_name}} Team...</p>"></textarea>
+            </div>
+
+            <!-- Plain Text Fallback -->
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Plain Text Fallback (For spam filter bypass)</label>
+              <textarea x-model="campaignForm.custom_body_text" rows="4" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 font-mono focus:outline-none focus:border-blue-500"></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+              <button type="button" @click="generatePreview()" class="btn btn-secondary text-xs">
+                <i data-lucide="eye" class="w-4 h-4"></i> Live Preview with Sample Lead
+              </button>
+              <button type="button" @click="launchCampaign()" :disabled="campaignForm.leads.length === 0" class="btn btn-primary text-xs shadow-lg shadow-blue-500/20 disabled:opacity-50">
+                <i data-lucide="send" class="w-4 h-4"></i> Launch Campaign (<span x-text="campaignForm.leads.length"></span> leads)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Preview Panel -->
+        <div class="space-y-4">
+          <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 space-y-3">
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="monitor" class="w-4 h-4 text-emerald-400"></i> Sample Lead Render Preview
+            </h3>
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-[11px] space-y-1">
+              <div><span class="text-slate-500">Sample Company:</span> <span class="text-white font-medium" x-text="previewData.sample_lead?.company_name || 'A Lennon Solicitors'"></span></div>
+              <div><span class="text-slate-500">Recipient:</span> <span class="text-blue-300 font-mono" x-text="previewData.sample_lead?.email || 'adrian@alennon.ie'"></span></div>
+              <div><span class="text-slate-500">Regulator:</span> <span class="text-slate-300" x-text="previewData.sample_lead?.regulator || 'Law Society of Ireland'"></span></div>
+            </div>
+
+            <div class="border-t border-slate-800 pt-3">
+              <span class="text-xs text-slate-500 block mb-1">Subject Preview:</span>
+              <div class="bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 text-xs font-medium text-white" x-text="previewData.rendered_subject || 'Subject will appear here...'"></div>
+            </div>
+
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Rendered Email HTML Body:</span>
+              <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 text-xs text-slate-200 max-h-96 overflow-y-auto prose prose-invert prose-sm" x-html="previewData.rendered_html || '<em>Body will render here...</em>'"></div>
+            </div>
+          </div>
+
+          <!-- Existing Campaigns List -->
+          <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 space-y-3">
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="history" class="w-4 h-4 text-blue-400"></i> Campaign Queue & Status
+            </h3>
+            <div class="divide-y divide-slate-800/60 max-h-60 overflow-y-auto">
+              <template x-for="c in campaigns" :key="c.id">
+                <div class="py-2.5 flex items-center justify-between text-xs">
+                  <div>
+                    <div class="font-medium text-white" x-text="c.name"></div>
+                    <div class="text-[10px] text-slate-400" x-text="'Sent: ' + c.sent_count + ' / ' + c.total_leads + ' | Failed: ' + c.failed_count"></div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="badge" :class="c.status === 'running' ? 'badge-green live-pulse' : c.status === 'completed' ? 'badge-blue' : 'badge-amber'" x-text="c.status"></span>
+                    <button x-show="c.status === 'running'" @click="pauseCampaign(c.id)" class="text-amber-400 hover:text-amber-300 p-1" title="Pause"><i data-lucide="pause" class="w-3.5 h-3.5"></i></button>
+                    <button x-show="c.status === 'paused' || c.status === 'draft'" @click="startCampaign(c.id)" class="text-emerald-400 hover:text-emerald-300 p-1" title="Start"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB: 5 DOMAINS MULTI-SMTP ================= -->
+    <div x-show="currentTab === 'domains'" class="space-y-6">
+      <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <i data-lucide="globe" class="w-5 h-5"></i>
+            </span>
+            <h2 class="text-base font-bold text-white">5-Domain Multi-SMTP Dispatch Hub</h2>
+          </div>
+          <p class="mt-1 text-xs text-slate-400">
+            Internal CRM engine on <strong class="text-indigo-400">fivenights.fun</strong>. Distribute cold outreach and re-engagement across 5 distinct domains to preserve domain reputation and avoid spam filters.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="loadMailboxes()" class="btn btn-secondary text-xs">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh Status
+          </button>
+        </div>
+      </div>
+
+      <!-- 5 Domain Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <template x-for="(mb, index) in mailboxes" :key="mb.id">
+          <div class="bg-[#131d31] rounded-xl border p-5 flex flex-col justify-between space-y-4 transition"
+               :class="mb.is_active ? 'border-slate-800 hover:border-slate-700 shadow-md' : 'border-slate-800/40 opacity-70'">
+            
+            <!-- Card Header -->
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      :class="mb.is_active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400'">
+                  <span class="w-1.5 h-1.5 rounded-full inline-block mr-1" :class="mb.is_active ? 'bg-emerald-400' : 'bg-slate-500'"></span>
+                  <span x-text="mb.is_active ? 'Active Domain' : 'Disabled'"></span>
+                </span>
+                <span class="text-xs font-mono text-slate-500" x-text="'Slot #' + mb.id"></span>
+              </div>
+              
+              <h3 class="mt-3 text-sm font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="mail" class="w-4 h-4 text-indigo-400"></i>
+                <span x-text="mb.name"></span>
+              </h3>
+              <p class="text-xs font-mono text-slate-300 mt-0.5 truncate" x-text="mb.sender_email || 'No sender email set'"></p>
+            </div>
+
+            <!-- Server Specs -->
+            <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-800/80 space-y-2 text-xs">
+              <div class="flex items-center justify-between text-slate-400">
+                <span>SMTP Host:</span>
+                <span class="font-mono text-slate-200" x-text="mb.smtp_host + ':' + mb.smtp_port"></span>
+              </div>
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Sender Name:</span>
+                <span class="text-slate-200 truncate max-w-[140px]" x-text="mb.sender_name"></span>
+              </div>
+              <div class="flex items-center justify-between text-slate-400">
+                <span>Password:</span>
+                <span class="text-xs" :class="mb.has_password ? 'text-emerald-400' : 'text-amber-400'" x-text="mb.has_password ? 'Configured' : 'Missing'"></span>
+              </div>
+            </div>
+
+            <!-- Daily Quota Usage Meter -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Daily Quota:</span>
+                <span class="font-semibold text-white">
+                  <span x-text="mb.sent_today || 0"></span> / <span x-text="mb.daily_limit || 50"></span>
+                  <span class="text-[10px] text-slate-400 font-normal">sent today</span>
+                </span>
+              </div>
+              <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div class="h-2 rounded-full transition-all duration-500"
+                     :class="(mb.sent_today / (mb.daily_limit || 50)) > 0.8 ? 'bg-amber-500' : 'bg-blue-500'"
+                     :style="'width: ' + Math.min(100, Math.round(((mb.sent_today || 0) / (mb.daily_limit || 50)) * 100)) + '%'"></div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-2 pt-2 border-t border-slate-800">
+              <button type="button" @click="testSingleMailbox(mb.id)" 
+                      class="flex-1 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition">
+                <span x-show="testingMailboxId !== mb.id"><i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-400"></i> Test SMTP</span>
+                <span x-show="testingMailboxId === mb.id" class="flex items-center gap-1"><i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Testing...</span>
+              </button>
+              <button type="button" @click="editMailbox(mb)" 
+                      class="py-1.5 px-3 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-medium flex items-center gap-1 transition">
+                <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Edit
+              </button>
+            </div>
+
+          </div>
+        </template>
+      </div>
+
+      <!-- Edit Mailbox Modal -->
+      <div x-show="editingMailbox !== null" class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-[#131d31] border border-slate-800 rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="server" class="w-4 h-4 text-blue-400"></i>
+              Configure Domain: <span class="text-blue-400" x-text="editingMailbox ? editingMailbox.name : ''"></span>
+            </h3>
+            <button @click="editingMailbox = null" class="text-slate-400 hover:text-white">&times;</button>
+          </div>
+
+          <template x-if="editingMailbox">
+            <form @submit.prevent="saveCurrentMailbox()" class="space-y-3">
+              <div>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Domain Label / Name</label>
+                <input type="text" x-model="editingMailbox.name" placeholder="Domain 1 (e.g. fivenights.fun)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+              </div>
+
+              <div class="grid grid-cols-3 gap-3">
+                <div class="col-span-2">
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">SMTP Server Host</label>
+                  <input type="text" x-model="editingMailbox.smtp_host" placeholder="smtp.yourdomain.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">Port</label>
+                  <input type="number" x-model.number="editingMailbox.smtp_port" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">SMTP Username</label>
+                  <input type="text" x-model="editingMailbox.smtp_user" placeholder="user@domain.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">SMTP Password / App Key</label>
+                  <input type="password" x-model="editingMailbox.smtp_password" placeholder="Leave blank to keep existing" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">Sender Display Name</label>
+                  <input type="text" x-model="editingMailbox.sender_name" placeholder="FiveNights Support" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">Sender Email Address</label>
+                  <input type="email" x-model="editingMailbox.sender_email" placeholder="support@fivenights.fun" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Daily Sending Limit</label>
+                  <input type="number" x-model.number="editingMailbox.daily_limit" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+                </div>
+                <div class="flex flex-col justify-end space-y-1.5">
+                  <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                    <input type="checkbox" x-model="editingMailbox.is_active" class="rounded bg-slate-900 border-slate-700 text-blue-600">
+                    <span>Active for Round-Robin</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                    <input type="checkbox" x-model="editingMailbox.smtp_use_tls" class="rounded bg-slate-900 border-slate-700 text-blue-600">
+                    <span>Use TLS (Port 587)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button type="button" @click="editingMailbox = null" class="btn btn-secondary text-xs">Cancel</button>
+                <button type="submit" class="btn btn-primary text-xs">Save Domain Configuration</button>
+              </div>
+            </form>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB: INACTIVE CLIENTS RE-ENGAGEMENT ================= -->
+    <div x-show="currentTab === 'reengagement'" class="space-y-6">
+      <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+          </span>
+          <div>
+            <h2 class="text-base font-bold text-white">Inactive Clients Re-activation Hub (Win-Back)</h2>
+            <p class="text-xs text-slate-400">Target and re-engage users who haven't logged in or used your websites for a long time across your 5 domains.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 1. Quick Inactive Clients Importer -->
+        <div class="bg-[#131d31] p-6 rounded-xl border border-slate-800 space-y-4">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="user-plus" class="w-4 h-4 text-emerald-400"></i> 1. Paste Inactive Client Emails
+          </h3>
+          <p class="text-xs text-slate-400">Paste your list of sleeping clients below. Format: <code>email, name, site_name, last_active</code> (1 per line).</p>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Target Site / Platform</label>
+              <input type="text" x-model="reengagementSite" placeholder="fivenights.fun" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Default Inactive Time</label>
+              <input type="text" x-model="reengagementDefaultLastActive" placeholder="several months ago" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Client List (CSV / Lines)</label>
+            <textarea x-model="reengagementText" rows="6" placeholder="client1@example.com, John Doe, fivenights.fun, 6 months ago&#10;user2@domain.ch, Sarah, fivenights.fun, 1 year ago&#10;investor@swiss.ch, Alex, horizoninvestmentsa.com, 4 months ago" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500"></textarea>
+          </div>
+
+          <button type="button" @click="importReengagementList()" class="btn btn-primary text-xs w-full justify-center">
+            <i data-lucide="upload" class="w-4 h-4"></i> Import Inactive Clients to CRM
+          </button>
+        </div>
+
+        <!-- 2. Launch Win-Back Campaign -->
+        <div class="bg-[#131d31] p-6 rounded-xl border border-slate-800 space-y-4">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="send" class="w-4 h-4 text-blue-400"></i> 2. Launch Win-Back Outreach
+          </h3>
+          <p class="text-xs text-slate-400">Choose a proven win-back template and dispatch across all 5 active domains using automated round-robin rotation.</p>
+
+          <div class="space-y-3">
+            <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+              <span class="text-xs font-bold text-slate-200 block mb-1">Recommended Re-engagement Templates:</span>
+              <ul class="text-xs text-slate-400 space-y-1">
+                <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Inactive Clients — We Miss You & Major Updates</li>
+                <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Inactive Clients — Exclusive Welcome-Back Bonus</li>
+                <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Inactive Clients — Quick Feedback & Account Check</li>
+              </ul>
+            </div>
+
+            <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+              <span class="text-xs font-bold text-slate-200 block mb-1">Domain Sending Strategy:</span>
+              <div class="flex items-center gap-2 text-xs text-emerald-400">
+                <i data-lucide="shuffle" class="w-4 h-4"></i>
+                <span>Smart Round-Robin across all 5 active domains (Automated Load Balancing)</span>
+              </div>
+            </div>
+
+            <button type="button" @click="currentTab = 'campaigns'" class="btn btn-secondary text-xs w-full justify-center">
+              <i data-lucide="arrow-right" class="w-4 h-4"></i> Open Campaign Builder to Review & Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB: AGENTS (MAX, FRED, CHRISS) ================= -->
+    <div x-show="currentTab === 'agents'" class="space-y-6">
+      <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </span>
+            <h2 class="text-base font-bold text-white">CRM Team Agent Accounts</h2>
+          </div>
+          <p class="mt-1 text-xs text-slate-400">
+            Dedicated team accounts for <strong class="text-white">Max</strong>, <strong class="text-white">Fred</strong>, and <strong class="text-white">Chriss</strong>. Switch active identity to send personalized outreach and win-back emails across your 5 domains.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">Current Sender Identity:</span>
+          <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span x-text="activeAgent ? activeAgent.name + ' (' + activeAgent.role + ')' : 'Max'"></span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 3 Agent Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <template x-for="ag in agents" :key="ag.id">
+          <div class="bg-[#131d31] rounded-xl border p-5 flex flex-col justify-between space-y-4 transition"
+               :class="activeAgent && activeAgent.id === ag.id ? 'border-purple-500/60 shadow-lg shadow-purple-500/10 bg-slate-900/60' : 'border-slate-800 hover:border-slate-700'">
+            
+            <!-- Card Header -->
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      :class="activeAgent && activeAgent.id === ag.id ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-slate-800 text-slate-400'">
+                  <span class="w-1.5 h-1.5 rounded-full inline-block mr-1" :class="activeAgent && activeAgent.id === ag.id ? 'bg-purple-400' : 'bg-slate-500'"></span>
+                  <span x-text="activeAgent && activeAgent.id === ag.id ? 'Active Sender' : 'Agent Account'"></span>
+                </span>
+                <span class="text-xs font-mono text-slate-500" x-text="'ID #' + ag.id"></span>
+              </div>
+
+              <!-- Avatar & Name -->
+              <div class="mt-4 flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-base font-bold shadow-md"
+                     :style="'background-color: ' + (ag.avatar_color || '#3b82f6')"
+                     x-text="ag.name.charAt(0)"></div>
+                <div>
+                  <h3 class="text-base font-bold text-white" x-text="ag.name"></h3>
+                  <p class="text-xs text-indigo-300 font-medium" x-text="ag.role"></p>
+                  <p class="text-xs font-mono text-slate-400 mt-0.5" x-text="ag.email"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Email Signature Preview -->
+            <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 space-y-1.5 text-xs">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">Email Signature:</span>
+              <pre class="font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed" x-text="ag.signature || 'No signature set'"></pre>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-2 pt-2 border-t border-slate-800">
+              <button type="button" @click="selectActiveAgent(ag)"
+                      class="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition"
+                      :class="activeAgent && activeAgent.id === ag.id ? 'bg-purple-600 text-white shadow' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'">
+                <i data-lucide="check" class="w-3.5 h-3.5" x-show="activeAgent && activeAgent.id === ag.id"></i>
+                <span x-text="activeAgent && activeAgent.id === ag.id ? 'Active Profile' : 'Select Profile'"></span>
+              </button>
+              <button type="button" @click="editAgent(ag)"
+                      class="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1 transition">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit
+              </button>
+            </div>
+
+          </div>
+        </template>
+      </div>
+
+      <!-- Edit Agent Modal -->
+      <div x-show="editingAgent !== null" class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-[#131d31] border border-slate-800 rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="user" class="w-4 h-4 text-purple-400"></i>
+              Edit Agent Profile: <span class="text-purple-400" x-text="editingAgent ? editingAgent.name : ''"></span>
+            </h3>
+            <button @click="editingAgent = null" class="text-slate-400 hover:text-white">&times;</button>
+          </div>
+
+          <template x-if="editingAgent">
+            <form @submit.prevent="saveCurrentAgent()" class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">Agent Name</label>
+                  <input type="text" x-model="editingAgent.name" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-300 mb-1 font-medium">Agent Email</label>
+                  <input type="email" x-model="editingAgent.email" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Job Title / Role</label>
+                <input type="text" x-model="editingAgent.role" placeholder="Client Relations Manager" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+              </div>
+
+              <div>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Avatar Color</label>
+                <div class="flex gap-2 items-center">
+                  <input type="color" x-model="editingAgent.avatar_color" class="h-8 w-14 bg-transparent cursor-pointer rounded border border-slate-700">
+                  <span class="text-xs font-mono text-slate-400" x-text="editingAgent.avatar_color"></span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Personal Email Signature</label>
+                <textarea x-model="editingAgent.signature" rows="4" class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500"></textarea>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button type="button" @click="editingAgent = null" class="btn btn-secondary text-xs">Cancel</button>
+                <button type="submit" class="btn btn-primary text-xs">Save Agent Profile</button>
+              </div>
+            </form>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 4: SMTP SETTINGS ================= -->
+    <div x-show="currentTab === 'settings'" class="max-w-3xl mx-auto space-y-6">
+      <div class="bg-[#131d31] p-6 rounded-xl border border-slate-800 space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="server" class="w-5 h-5 text-blue-400"></i> SMTP Server & Anti-Spam Dispatch Settings
+            </h2>
+            <p class="text-xs text-slate-400">Configure your mail transport provider, sender credentials, and rate limits.</p>
+          </div>
+          <!-- Quick Preset Buttons -->
+          <div class="flex gap-1.5">
+            <button type="button" @click="applySmtpPreset('gmail')" class="tag-btn">Gmail</button>
+            <button type="button" @click="applySmtpPreset('outlook')" class="tag-btn">Outlook 365</button>
+            <button type="button" @click="applySmtpPreset('sendgrid')" class="tag-btn">SendGrid</button>
+            <button type="button" @click="applySmtpPreset('ses')" class="tag-btn">Amazon SES</button>
+          </div>
+        </div>
+
+        <!-- Safe Dry-Run Mode Toggle Banner -->
+        <div class="p-4 rounded-xl border flex items-center justify-between gap-4" :class="settings.dry_run_mode ? 'bg-amber-950/40 border-amber-800/60' : 'bg-emerald-950/40 border-emerald-800/60'">
+          <div>
+            <div class="text-xs font-bold" :class="settings.dry_run_mode ? 'text-amber-300' : 'text-emerald-300'">
+              <span x-text="settings.dry_run_mode ? '⚠️ DRY-RUN SIMULATION ACTIVE' : '🚀 LIVE EMAIL SENDING ACTIVE'"></span>
+            </div>
+            <p class="text-[11px] text-slate-300 mt-0.5">
+              <span x-text="settings.dry_run_mode ? 'In dry-run mode, all templates render and variables validate completely without dispatching real emails to customers.' : 'Real emails will be delivered directly to the recipients via your configured SMTP server.'"></span>
+            </p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" x-model="settings.dry_run_mode" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+          </label>
+        </div>
+
+        <form @submit.prevent="saveSettings()" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Host</label>
+              <input type="text" x-model="settings.smtp_host" placeholder="smtp.gmail.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Port</label>
+              <input type="number" x-model.number="settings.smtp_port" placeholder="587" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Username / Email</label>
+              <input type="text" x-model="settings.smtp_user" placeholder="your-email@gmail.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Password / App Password</label>
+              <input type="password" x-model="settings.smtp_password" placeholder="••••••••••••••••" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Sender Display Name</label>
+              <input type="text" x-model="settings.sender_name" placeholder="Web Development Agency" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Sender From Email</label>
+              <input type="email" x-model="settings.sender_email" placeholder="outreach@yourdomain.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+          </div>
+
+          <!-- Rate Limiting & Anti-Spam -->
+          <div class="p-4 bg-slate-900/60 rounded-lg border border-slate-800 space-y-3">
+            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="shield" class="w-4 h-4 text-blue-400"></i> Anti-Spam & Delivery Safeguards
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Daily Sending Limit</label>
+                <input type="number" x-model.number="settings.daily_limit" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Min Delay (seconds)</label>
+                <input type="number" x-model.number="settings.delay_min" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Max Delay (seconds)</label>
+                <input type="number" x-model.number="settings.delay_max" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+            <button type="button" @click="testConnection()" class="btn btn-secondary text-xs">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Test SMTP Connection
+            </button>
+            <button type="submit" class="btn btn-primary text-xs shadow-lg shadow-blue-500/20">
+              <i data-lucide="save" class="w-4 h-4"></i> Save Settings
+            </button>
+          </div>
+        </form>
+
+        <!-- Test Email Dispatch Tool -->
+        <div class="border-t border-slate-800 pt-5 space-y-3">
+          <h3 class="text-xs font-bold text-white flex items-center gap-2">
+            <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i> Send Immediate Test Email
+          </h3>
+          <div class="flex gap-2">
+            <input type="email" x-model="testEmailAddress" placeholder="Enter your email to receive a test dispatch..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            <button type="button" @click="sendTestEmail()" class="btn btn-success text-xs">
+              <i data-lucide="send" class="w-4 h-4"></i> Send Test
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 5: DISPATCH LOGS ================= -->
+    <div x-show="currentTab === 'logs'" class="space-y-4">
+      <div class="bg-[#131d31] p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="list-ordered" class="w-4 h-4 text-blue-400"></i> Complete Dispatch History
+          </h2>
+          <p class="text-xs text-slate-400">Chronological record of all email delivery attempts, simulation runs, and errors.</p>
+        </div>
+        <button @click="loadLogs()" class="btn btn-secondary text-xs py-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh Logs
+        </button>
+      </div>
+
+      <div class="bg-[#131d31] rounded-xl border border-slate-800 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="p-3">Status</th>
+                <th class="p-3">Recipient Email</th>
+                <th class="p-3">Company Name</th>
+                <th class="p-3">Subject Line</th>
+                <th class="p-3">Error / Details</th>
+                <th class="p-3">Timestamp</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">
+              <template x-for="l in logs" :key="l.id">
+                <tr class="hover:bg-slate-800/30">
+                  <td class="p-3">
+                    <span class="badge" :class="l.status === 'SENT' ? 'badge-green' : l.status === 'DRY_RUN_SUCCESS' ? 'badge-amber' : 'badge-red'" x-text="l.status"></span>
+                  </td>
+                  <td class="p-3 text-blue-300" x-text="l.recipient_email"></td>
+                  <td class="p-3 text-white font-sans text-xs" x-text="l.company_name"></td>
+                  <td class="p-3 text-slate-300 font-sans text-xs truncate max-w-xs" x-text="l.subject"></td>
+                  <td class="p-3 text-red-400 font-sans text-xs" x-text="l.error_details || '-'"></td>
+                  <td class="p-3 text-slate-500" x-text="l.created_at"></td>
+                </tr>
+              </template>
+              <tr x-show="logs.length === 0">
+                <td colspan="6" class="p-8 text-center text-xs text-slate-500 font-sans">
+                  No logs recorded yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+  <script>
+    // Initialize Lucide icons on load
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+﻿.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite
+outreach.db
+.env
+*.log
+node_modules/
+.firebase/
+test_*.py
