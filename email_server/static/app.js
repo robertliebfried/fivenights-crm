@@ -79,6 +79,8 @@ function app() {
     quickSendSubject: '',
     quickSendBody: '',
     quickSendSending: false,
+    guideModalOpen: false,
+    guideTab: 'quickstart',
 
     get filteredInboxThreads() {
       return (this.inboxThreads || []).filter(t => {
@@ -191,6 +193,34 @@ function app() {
       setTimeout(() => {
         this.toast.visible = false;
       }, 4500);
+    },
+
+    openGuide(tab = 'quickstart') {
+      this.guideTab = tab;
+      this.guideModalOpen = true;
+      this.$nextTick(() => {
+        if (window.lucide) lucide.createIcons();
+      });
+    },
+
+    formatDate(dt) {
+      if (!dt) return 'Just now';
+      try {
+        const d = new Date(dt);
+        if (isNaN(d.getTime())) return String(dt);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMin / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffMin < 1) return 'Just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      } catch (e) {
+        return String(dt);
+      }
     },
 
     async loadStats() {

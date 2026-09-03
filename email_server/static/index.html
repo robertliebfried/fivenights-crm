@@ -84,6 +84,9 @@
         <button @click="currentTab = 'logs'" :class="currentTab === 'logs' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap transition">
           <i data-lucide="list-ordered" class="w-3.5 h-3.5"></i> Logs
         </button>
+        <button @click="openGuide('quickstart')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 flex items-center gap-1.5 whitespace-nowrap transition shadow-sm" title="Open complete CRM User Guide & Instructions">
+          <i data-lucide="book-open" class="w-3.5 h-3.5 text-amber-400"></i> How to Use CRM
+        </button>
       </nav>
 
       <!-- Active Agent Switcher Badge & Logout -->
@@ -193,6 +196,32 @@
           Sign In to Portal &rarr;
         </button>
       </form>
+
+      <!-- Quick Instructions & Role Breakdown -->
+      <div class="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl space-y-2 text-[11px] text-slate-300">
+        <div class="flex items-center gap-1.5 font-bold text-slate-200">
+          <i data-lucide="help-circle" class="w-4 h-4 text-blue-400"></i>
+          <span>Portal Access Guide &amp; Roles:</span>
+        </div>
+        <ul class="space-y-1.5 text-slate-400">
+          <li class="flex items-start gap-1.5">
+            <span class="text-emerald-400 font-bold">•</span>
+            <span><strong class="text-white">1-Click Login:</strong> Click any of the 4 profile buttons above to instantly sign in without typing.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-amber-400 font-bold">•</span>
+            <span><strong class="text-white">Default Password:</strong> <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">347581</code> for all accounts.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-rose-400 font-bold">•</span>
+            <span><strong class="text-rose-300">John (Admin):</strong> Full system controls, lead import, mailbox assignments, and settings.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <span class="text-sky-400 font-bold">•</span>
+            <span><strong class="text-sky-300">Max, Fred, Chriss (Agents):</strong> Customer management, claim leads, 1-click B2C pitches, unified inbox.</span>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 
@@ -252,6 +281,98 @@
             </template>
           </div>
         </template>
+      </div>
+
+      <!-- Agent Daily Workflow Guide (Visible to Max, Fred, Chriss) -->
+      <div x-show="!isAdmin()" class="bg-gradient-to-r from-sky-900/30 via-slate-900 to-slate-900 p-4 rounded-xl border border-sky-800/40 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="compass" class="w-4 h-4 text-sky-400"></i>
+            <span class="text-xs font-bold text-sky-300 uppercase tracking-wider">Agent Daily Playbook — 3 Quick Steps</span>
+          </div>
+          <span class="text-[10px] text-slate-400">Signed in as <strong class="text-white" x-text="activeAgent?.name || 'Agent'"></strong></span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div @click="currentTab = 'leads'; leadsFilter.relevance = 'unassigned'; loadLeads(1);" class="p-3 bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 rounded-xl cursor-pointer transition group">
+            <div class="flex items-center gap-2 text-sky-300 font-bold mb-1">
+              <span class="w-5 h-5 rounded-full bg-sky-500/20 flex items-center justify-center text-[11px]">1</span>
+              <span>Claim New Leads</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Go to Customers &rarr; filter <strong class="text-slate-200">Unassigned Pool</strong>. Click <strong class="text-sky-300">+ Claim</strong> to add players to your portfolio.</p>
+          </div>
+          <div @click="currentTab = 'inbox'; loadInboxThreads();" class="p-3 bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-xl cursor-pointer transition group">
+            <div class="flex items-center gap-2 text-emerald-300 font-bold mb-1">
+              <span class="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[11px]">2</span>
+              <span>Check Unified Inbox</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Read inbound customer inquiries. Use 1-click reply chips to respond in under 15 seconds.</p>
+          </div>
+          <div @click="currentTab = 'leads'; leadsFilter.relevance = 'mine'; loadLeads(1);" class="p-3 bg-slate-900/80 border border-slate-800 hover:border-amber-500/50 rounded-xl cursor-pointer transition group">
+            <div class="flex items-center gap-2 text-amber-300 font-bold mb-1">
+              <span class="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[11px]">3</span>
+              <span>Nurture Your Portfolio</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Click <strong class="text-amber-300">⚡ Send</strong> to trigger tailored VIP reload, win-back, or check-in emails.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4-Step Interactive Operational Stepper (Always Available) -->
+      <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="map" class="w-4 h-4 text-indigo-400"></i>
+              How FiveNights CRM Operates — 4-Step Operational Flow
+            </h3>
+            <p class="text-[11px] text-slate-400 mt-0.5">Follow this simple sequence to maximize deliverability, engage VIP players, and manage replies.</p>
+          </div>
+          <button type="button" @click="openGuide('quickstart')" class="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1">
+            <span>Open Interactive Handbook</span> &rarr;
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Step 1 -->
+          <div @click="currentTab = 'domains'" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 rounded-xl cursor-pointer transition group">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">Step 1</span>
+              <i data-lucide="mail-plus" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition"></i>
+            </div>
+            <h4 class="text-xs font-bold text-white group-hover:text-emerald-300">Mailbox Infrastructure</h4>
+            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">20 Google Workspace accounts split evenly across agents (100/day limit per account) for 99%+ inbox placement.</p>
+          </div>
+
+          <!-- Step 2 -->
+          <div @click="currentTab = 'leads'" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 rounded-xl cursor-pointer transition group">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] uppercase font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">Step 2</span>
+              <i data-lucide="user-round" class="w-4 h-4 text-blue-400 group-hover:scale-110 transition"></i>
+            </div>
+            <h4 class="text-xs font-bold text-white group-hover:text-blue-300">Customers &amp; Lead Pools</h4>
+            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Admin imports CSVs into the unassigned pool. Agents claim leads directly or Admin distributes them evenly.</p>
+          </div>
+
+          <!-- Step 3 -->
+          <div @click="currentTab = 'campaigns'" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-purple-500/50 rounded-xl cursor-pointer transition group">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] uppercase font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">Step 3</span>
+              <i data-lucide="send" class="w-4 h-4 text-purple-400 group-hover:scale-110 transition"></i>
+            </div>
+            <h4 class="text-xs font-bold text-white group-hover:text-purple-300">1-Click Outreach</h4>
+            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Click ⚡ Send for instant 1-click B2C pitch emails (VIP Concierge, Win-Back, Tier Upgrade, Check-In).</p>
+          </div>
+
+          <!-- Step 4 -->
+          <div @click="currentTab = 'inbox'; loadInboxThreads();" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-sky-500/50 rounded-xl cursor-pointer transition group">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] uppercase font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full">Step 4</span>
+              <i data-lucide="inbox" class="w-4 h-4 text-sky-400 group-hover:scale-110 transition"></i>
+            </div>
+            <h4 class="text-xs font-bold text-white group-hover:text-sky-300">Unified Inbox &amp; Replies</h4>
+            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Incoming customer inquiries land in real-time. Reply using preset chips via your dedicated Google Workspace account.</p>
+          </div>
+        </div>
       </div>
 
       <!-- Stats Grid -->
@@ -362,6 +483,51 @@
 
     <!-- ================= TAB 2: CUSTOMERS EXPLORER ================= -->
     <div x-show="currentTab === 'leads'" class="space-y-4">
+
+      <!-- How to Use Customers Guide Banner -->
+      <div class="p-4 bg-gradient-to-r from-sky-950/40 via-slate-900 to-slate-900 border border-sky-500/30 rounded-xl text-xs space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="p-1.5 rounded-lg bg-sky-500/20 text-sky-400">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <span class="font-bold text-white block">How to Manage, Claim &amp; Outreach Customers:</span>
+              <span class="text-[11px] text-slate-400">Follow these 3 simple rules for maximum portfolio performance:</span>
+            </div>
+          </div>
+          <button type="button" @click="openGuide('agent')" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1">
+            <span>Agent Handbook</span> &rarr;
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1">
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-amber-300 font-bold">
+              <i data-lucide="hand" class="w-3.5 h-3.5"></i>
+              <span>1. Claiming New Leads:</span>
+            </div>
+            <p class="text-slate-400">Filter by <strong class="text-slate-200">"🗂 Unassigned Pool"</strong> below. Click <strong class="text-sky-300 font-semibold">+ Claim</strong> or <strong class="text-sky-300 font-semibold">⚡ Send</strong> on any customer to assign them to yourself.</p>
+          </div>
+
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+              <span>2. 1-Click Fast Outreach:</span>
+            </div>
+            <p class="text-slate-400">Click <strong class="text-emerald-300 font-semibold">⚡ Send</strong> on any row. Select from 4 B2C templates (VIP Concierge, Win-Back, Tier Upgrade, Check-In) to send in 5 seconds.</p>
+          </div>
+
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-indigo-300 font-bold">
+              <i data-lucide="users" class="w-3.5 h-3.5"></i>
+              <span>3. Filter &amp; Bulk Campaigns:</span>
+            </div>
+            <p class="text-slate-400">Filter by <strong class="text-slate-200">"👑 VIP"</strong> or <strong class="text-slate-200">"👤 My Assigned Leads"</strong>. Check multiple boxes and click <strong class="text-indigo-300 font-semibold">Launch Campaign</strong> to batch pitch.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Search and Filter Bar -->
       <div class="bg-[#131d31] p-4 rounded-xl border border-slate-800 space-y-3">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -893,6 +1059,46 @@
 
     <!-- ================= TAB 3: CAMPAIGN BUILDER ================= -->
     <div x-show="currentTab === 'campaigns'" class="space-y-6">
+
+      <!-- Campaign Builder Instructions Banner -->
+      <div class="p-4 bg-gradient-to-r from-purple-950/40 via-slate-900 to-slate-900 border border-purple-500/30 rounded-xl text-xs space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <span class="font-bold text-white block">How to Build &amp; Launch an Email Sequence:</span>
+              <span class="text-[11px] text-slate-400">Dispatch tailored B2C campaigns across your 20 Google Workspace mailboxes in 3 steps:</span>
+            </div>
+          </div>
+          <button type="button" @click="openGuide('deliverability')" class="text-[11px] text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1">
+            <span>Anti-Spam &amp; Deliverability Guide</span> &rarr;
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1">
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-purple-300 font-bold">
+              <span>Step 1: Select Recipients</span>
+            </div>
+            <p class="text-slate-400">Select customers in the <strong class="text-slate-200">Customers tab</strong> or load a target segment. Current selected: <strong class="text-purple-300" x-text="campaignForm.leads.length"></strong>.</p>
+          </div>
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-sky-300 font-bold">
+              <span>Step 2: Apply Template</span>
+            </div>
+            <p class="text-slate-400">Choose from pre-approved B2C templates below. Click variable tags (e.g. <code class="text-sky-300">{{first_name}}</code>) to personalize.</p>
+          </div>
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
+              <span>Step 3: Preview &amp; Dispatch</span>
+            </div>
+            <p class="text-slate-400">Check the <strong class="text-slate-200">Sample Preview</strong> panel on the right. Hit <strong class="text-emerald-300">Launch Campaign</strong> to queue automated sending.</p>
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Editor Panel -->
         <div class="lg:col-span-2 space-y-4">
@@ -907,7 +1113,7 @@
             <!-- Campaign Name -->
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Campaign Name</label>
-              <input type="text" x-model="campaignForm.name" placeholder="e.g. UK & Irish Solicitors Web Pitch 2026" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+              <input type="text" x-model="campaignForm.name" placeholder="e.g. VIP High-Roller Weekend Reload March 2026" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
             </div>
 
             <!-- Template Preset Selector -->
@@ -923,12 +1129,11 @@
 
             <!-- Variable Insertion Tags -->
             <div>
-              <label class="block text-xs font-medium text-slate-400 mb-1.5">Insert Dynamic Personalization Tags (Click to copy/insert):</label>
+              <label class="block text-xs font-medium text-slate-400 mb-1.5">Insert Personalization Tags (Click to insert):</label>
               <div class="flex flex-wrap gap-1.5">
+                <button type="button" @click="insertTag('{{first_name}}')" class="tag-btn">{{first_name}}</button>
                 <button type="button" @click="insertTag('{{company_name}}')" class="tag-btn">{{company_name}}</button>
                 <button type="button" @click="insertTag('{{country}}')" class="tag-btn">{{country}}</button>
-                <button type="button" @click="insertTag('{{regulator}}')" class="tag-btn">{{regulator}}</button>
-                <button type="button" @click="insertTag('{{licence_number}}')" class="tag-btn">{{licence_number}}</button>
                 <button type="button" @click="insertTag('{{city}}')" class="tag-btn">{{city}}</button>
                 <button type="button" @click="insertTag('{{sender_name}}')" class="tag-btn">{{sender_name}}</button>
                 <button type="button" @click="insertTag('{{sender_email}}')" class="tag-btn">{{sender_email}}</button>
@@ -1049,6 +1254,33 @@
           <button type="button" @click="loadInboxThreads()" class="btn btn-secondary text-xs py-1.5 px-2.5 flex items-center gap-1">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
           </button>
+        </div>
+      </div>
+
+      <!-- Inbox Guide Banner for Agents -->
+      <div class="p-3.5 bg-gradient-to-r from-sky-950/40 via-slate-900 to-slate-900 border border-sky-500/30 rounded-xl text-xs space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="help-circle" class="w-4 h-4 text-sky-400"></i>
+            <span class="font-bold text-white">How the Unified Inbox Works:</span>
+          </div>
+          <button type="button" @click="openGuide('agent')" class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1">
+            <span>Agent Playbook</span> &rarr;
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] text-slate-300 pt-1">
+          <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+            <span class="font-bold text-rose-300 block mb-0.5">• Unread &amp; Live Threads</span>
+            <span class="text-slate-400">Customer replies arrive on the left. Unread messages show red indicators. Click to view complete history.</span>
+          </div>
+          <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+            <span class="font-bold text-amber-300 block mb-0.5">• 1-Click Reply Chips</span>
+            <span class="text-slate-400">Use instant chips (<strong class="text-white">VIP Reload, Win-Back, Payout Priority</strong>) to fill high-converting answers in 1 click.</span>
+          </div>
+          <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+            <span class="font-bold text-emerald-300 block mb-0.5">• Dedicated Mailbox Dispatch</span>
+            <span class="text-slate-400">Replies are delivered from your dedicated Google Workspace SMTP account, protecting domain deliverability.</span>
+          </div>
         </div>
       </div>
 
@@ -1255,6 +1487,50 @@
           <button type="button" @click="loadMailboxes()" class="btn btn-secondary text-xs">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
           </button>
+        </div>
+      </div>
+
+      <!-- Mailbox Infrastructure & 20-Account Setup Guide -->
+      <div class="p-4 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-xl text-xs space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <span class="font-bold text-white block">Why 20 Google Workspace Accounts? (Maximum Inbox Deliverability)</span>
+              <span class="text-[11px] text-slate-400">Our multi-mailbox pooling architecture keeps your sending safe and prevents spam classification.</span>
+            </div>
+          </div>
+          <button type="button" @click="openGuide('deliverability')" class="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1">
+            <span>Setup App Passwords</span> &rarr;
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1">
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+              <span>Safe Sending Limits:</span>
+            </div>
+            <p class="text-slate-400">Google Workspace allows up to 2,000 emails/day, but keeping each account under <strong class="text-white">100 emails/day</strong> guarantees 99%+ deliverability.</p>
+          </div>
+
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-amber-300 font-bold">
+              <i data-lucide="key" class="w-3.5 h-3.5"></i>
+              <span>Google App Password:</span>
+            </div>
+            <p class="text-slate-400">Always use a <strong class="text-amber-300">16-character App Password</strong> from Google Security. Regular account passwords are blocked by Google SMTP.</p>
+          </div>
+
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-indigo-300 font-bold">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+              <span>Bulk 1-Click Import:</span>
+            </div>
+            <p class="text-slate-400">Click <strong class="text-indigo-300">"Bulk Connect"</strong> above and paste accounts in <code class="text-slate-300">email : password : agent</code> format to set up 20 accounts in seconds.</p>
+          </div>
         </div>
       </div>
 
@@ -1601,6 +1877,45 @@
         </div>
       </div>
 
+      <!-- Agents & Permissions Guide Banner -->
+      <div class="p-4 bg-gradient-to-r from-purple-950/40 via-slate-900 to-slate-900 border border-purple-500/30 rounded-xl text-xs space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+              <i data-lucide="shield-alert" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <span class="font-bold text-white block">Agent Accounts &amp; Role-Based Access Control (RBAC):</span>
+              <span class="text-[11px] text-slate-400">Manage agent identities, outbound email signatures, and assigned customer portfolios.</span>
+            </div>
+          </div>
+          <button type="button" @click="openGuide('agent')" class="text-[11px] text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1">
+            <span>Agent Handbook</span> &rarr;
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1">
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-purple-300 font-bold">
+              <span>Switching Active Sender:</span>
+            </div>
+            <p class="text-slate-400">Click <strong class="text-purple-300">"Select Profile"</strong> on any agent card below to switch which agent signature and name is used on outgoing emails.</p>
+          </div>
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-rose-300 font-bold">
+              <span>Admin vs Agent Permissions:</span>
+            </div>
+            <p class="text-slate-400"><strong class="text-rose-400">John (Admin)</strong> can edit all records and reassign leads. <strong class="text-white">Agents</strong> can only edit notes they personally authored.</p>
+          </div>
+          <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+            <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
+              <span>Signatures &amp; Custom Avatars:</span>
+            </div>
+            <p class="text-slate-400">Click <strong class="text-white">Edit</strong> on any profile to update your job title, direct email, avatar color, and personalized email signature.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- 3 Agent Cards Grid -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
         <template x-for="ag in agents" :key="ag.id">
@@ -1723,6 +2038,45 @@
             <button type="button" @click="applySmtpPreset('outlook')" class="tag-btn">Outlook 365</button>
             <button type="button" @click="applySmtpPreset('sendgrid')" class="tag-btn">SendGrid</button>
             <button type="button" @click="applySmtpPreset('ses')" class="tag-btn">Amazon SES</button>
+          </div>
+        </div>
+
+        <!-- Settings & Deliverability Best Practices Banner -->
+        <div class="p-4 bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-xl text-xs space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </span>
+              <div>
+                <span class="font-bold text-white block">Safe Dispatch &amp; Anti-Spam Delivery Rules:</span>
+                <span class="text-[11px] text-slate-400">Follow these delivery guidelines to prevent inbox blocking and maintain high reputation.</span>
+              </div>
+            </div>
+            <button type="button" @click="openGuide('deliverability')" class="text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1">
+              <span>Deliverability Guide</span> &rarr;
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1">
+            <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+              <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
+                <span>Google Port 587 (TLS):</span>
+              </div>
+              <p class="text-slate-400">Use <code class="text-white">smtp.gmail.com</code> with Port <code class="text-white">587</code> and STARTTLS enabled. Never use unencrypted Port 25.</p>
+            </div>
+            <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+              <div class="flex items-center gap-1.5 text-amber-300 font-bold">
+                <span>Delay Interval (10–25s):</span>
+              </div>
+              <p class="text-slate-400">Setting delays between 10 and 25 seconds mimics human sending patterns and bypasses algorithmic rate limiters.</p>
+            </div>
+            <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+              <div class="flex items-center gap-1.5 text-indigo-300 font-bold">
+                <span>Dry-Run Simulation:</span>
+              </div>
+              <p class="text-slate-400">Keep <strong class="text-amber-300">Dry-Run Simulation</strong> enabled to test templates, tags, and formatting safely before live customer delivery.</p>
+            </div>
           </div>
         </div>
 
@@ -1891,6 +2245,20 @@
         <button @click="quickSendModalOpen = false" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
       </div>
 
+      <!-- Quick Send Instructions Tip -->
+      <div class="p-3 bg-gradient-to-r from-sky-950/50 to-slate-900 border border-sky-500/30 rounded-xl text-xs space-y-1.5 text-slate-300">
+        <div class="flex items-center justify-between text-sky-300 font-bold">
+          <span class="flex items-center gap-1.5">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            How 1-Click Fast Outreach Works:
+          </span>
+          <span class="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full font-semibold">1-Click Dispatch</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          1. Select one of the 4 proven B2C strategies below &bull; 2. Subject and personalized message are auto-generated &bull; 3. Click <strong class="text-white">Send Email Now</strong>: this customer is automatically added to your portfolio, a conversation opens in your Unified Inbox, and the email dispatches via your assigned Google Workspace SMTP account.
+        </p>
+      </div>
+
       <!-- Quick Template Cards Selection (4 B2C choices) -->
       <div>
         <label class="block text-xs text-slate-300 font-medium mb-2">Choose Email Strategy / Template:</label>
@@ -1979,8 +2347,363 @@
         </div>
       </div>
     </div>
+  <!-- ================= INTERACTIVE CRM USER GUIDE & HANDBOOK MODAL ================= -->
+  <div x-show="guideModalOpen" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style="display: none;">
+    <div class="bg-[#131d31] border border-slate-700/80 rounded-2xl max-w-4xl w-full p-6 space-y-5 shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+            <i data-lucide="book-open" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              FiveNights.fun CRM — Interactive User Guide &amp; Handbook
+              <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">Official Manual</span>
+            </h3>
+            <p class="text-xs text-slate-400">Everything you need to know about managing leads, 20 Google Workspace mailboxes, fast outreach, and unified inbox.</p>
+          </div>
+        </div>
+        <button @click="guideModalOpen = false" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 text-xl font-bold transition">&times;</button>
+      </div>
+
+      <!-- Navigation Tabs inside Guide -->
+      <div class="flex items-center gap-1.5 border-b border-slate-800 pb-2 text-xs overflow-x-auto shrink-0">
+        <button type="button" @click="guideTab = 'quickstart'"
+                :class="guideTab === 'quickstart' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition whitespace-nowrap">
+          <i data-lucide="zap" class="w-3.5 h-3.5"></i> 🚀 Quick Start (4 Steps)
+        </button>
+        <button type="button" @click="guideTab = 'admin'"
+                :class="guideTab === 'admin' ? 'bg-rose-500 text-white font-bold shadow' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition whitespace-nowrap">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-rose-300"></i> 👑 Admin Guide (John)
+        </button>
+        <button type="button" @click="guideTab = 'agent'"
+                :class="guideTab === 'agent' ? 'bg-sky-500 text-white font-bold shadow' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition whitespace-nowrap">
+          <i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-300"></i> 💼 Agent Playbook (Max, Fred, Chriss)
+        </button>
+        <button type="button" @click="guideTab = 'deliverability'"
+                :class="guideTab === 'deliverability' ? 'bg-emerald-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition whitespace-nowrap">
+          <i data-lucide="mail-check" class="w-3.5 h-3.5"></i> 🛡️ 20 Google Workspace Accounts &amp; SMTP
+        </button>
+        <button type="button" @click="guideTab = 'faq'"
+                :class="guideTab === 'faq' ? 'bg-purple-500 text-white font-bold shadow' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
+                class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition whitespace-nowrap">
+          <i data-lucide="help-circle" class="w-3.5 h-3.5 text-purple-300"></i> ❓ FAQ &amp; Tips
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div class="overflow-y-auto flex-1 pr-2 space-y-4 text-xs">
+
+        <!-- TAB 1: QUICK START -->
+        <div x-show="guideTab === 'quickstart'" class="space-y-4">
+          <div class="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1">
+            <h4 class="font-bold text-amber-300 text-sm flex items-center gap-1.5">
+              <i data-lucide="rocket" class="w-4 h-4"></i> The FiveNights CRM Workflow in 4 Steps:
+            </h4>
+            <p class="text-slate-300 leading-relaxed">
+              Our CRM is designed specifically for B2C player retention, VIP account management, and automated re-engagement across FiveNights.fun. Follow this 4-step sequence:
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <!-- Step 1 Card -->
+            <div class="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Step 1</span>
+                <span class="text-slate-500 font-mono text-[10px]">Infrastructure</span>
+              </div>
+              <h5 class="text-sm font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="mail-plus" class="w-4 h-4 text-emerald-400"></i> Connect Google Workspace Mailboxes
+              </h5>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Connect your 20 Google Workspace paid accounts via <code class="text-slate-200">smtp.gmail.com:587</code> with 16-character Google App Passwords. Each account handles up to 100 emails/day to guarantee 100% primary inbox delivery.
+              </p>
+              <div class="pt-1">
+                <button type="button" @click="guideModalOpen = false; currentTab = 'domains';" class="text-[11px] text-emerald-400 hover:underline font-semibold flex items-center gap-1">
+                  Go to Mailboxes Tab &rarr;
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 2 Card -->
+            <div class="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">Step 2</span>
+                <span class="text-slate-500 font-mono text-[10px]">Lead Management</span>
+              </div>
+              <h5 class="text-sm font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="users" class="w-4 h-4 text-blue-400"></i> Manage Customer Pool &amp; Claim Leads
+              </h5>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                <strong class="text-rose-300">John (Admin)</strong> imports customer CSVs or clicks <strong>"Distribute Leads"</strong> to evenly split unassigned accounts. <strong class="text-sky-300">Agents</strong> browse the "Unassigned Pool" and click <strong>+ Claim</strong> to add customers to their own portfolio.
+              </p>
+              <div class="pt-1">
+                <button type="button" @click="guideModalOpen = false; currentTab = 'leads';" class="text-[11px] text-blue-400 hover:underline font-semibold flex items-center gap-1">
+                  Go to Customers Tab &rarr;
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 3 Card -->
+            <div class="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Step 3</span>
+                <span class="text-slate-500 font-mono text-[10px]">Outreach</span>
+              </div>
+              <h5 class="text-sm font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="zap" class="w-4 h-4 text-purple-400"></i> Fast 1-Click Outreach / Campaigns
+              </h5>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Click <strong class="text-amber-300">⚡ Send</strong> on any customer row for 1-click B2C messaging (VIP Concierge, Win-Back, Tier Upgrade, Check-In), or check multiple boxes to launch an automated campaign queue.
+              </p>
+              <div class="pt-1">
+                <button type="button" @click="guideModalOpen = false; currentTab = 'campaigns';" class="text-[11px] text-purple-400 hover:underline font-semibold flex items-center gap-1">
+                  Go to Campaigns Tab &rarr;
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 4 Card -->
+            <div class="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">Step 4</span>
+                <span class="text-slate-500 font-mono text-[10px]">Unified Inbox</span>
+              </div>
+              <h5 class="text-sm font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="inbox" class="w-4 h-4 text-sky-400"></i> Reply &amp; Retain via Unified Inbox
+              </h5>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                When customers reply, they appear immediately in the Unified Inbox. Agents use <strong>1-Click Reply Chips</strong> to reply instantly via their assigned Google Workspace SMTP account.
+              </p>
+              <div class="pt-1">
+                <button type="button" @click="guideModalOpen = false; currentTab = 'inbox'; loadInboxThreads();" class="text-[11px] text-sky-400 hover:underline font-semibold flex items-center gap-1">
+                  Open Unified Inbox &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: ADMIN GUIDE -->
+        <div x-show="guideTab === 'admin'" class="space-y-4">
+          <div class="p-4 bg-rose-950/40 border border-rose-800/40 rounded-xl space-y-1">
+            <h4 class="font-bold text-rose-300 text-sm flex items-center gap-1.5">
+              <i data-lucide="shield" class="w-4 h-4"></i> John (Managing Director &amp; Administrator) Controls:
+            </h4>
+            <p class="text-slate-300 text-[11px] leading-relaxed">
+              As the administrator, John has executive power to manage all customer data, import files, assign mailboxes, and balance team workloads.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="upload-cloud" class="w-4 h-4 text-emerald-400"></i>
+                1. How to Import Customers from CSV:
+              </span>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Click <strong>"Import CSV"</strong> in Overview or Customers tab. You can either upload a <code class="text-slate-200">.csv</code> file or paste raw text rows. Supported headers: <code class="text-sky-300">email, name, company/username, phone, country</code>. Delimiters supported: comma (<code class="text-amber-300">,</code>), semicolon (<code class="text-amber-300">;</code>), or tab.
+              </p>
+            </div>
+
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-blue-400"></i>
+                2. How to Distribute Leads Evenly:
+              </span>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                In the Overview tab, click <strong>"Distribute Leads"</strong>. The system will find all unassigned customers and divide them equally between <strong class="text-white">Max</strong>, <strong class="text-white">Fred</strong>, and <strong class="text-white">Chriss</strong>.
+              </p>
+            </div>
+
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="mail-plus" class="w-4 h-4 text-amber-400"></i>
+                3. How to Auto-Assign Google Workspace Mailboxes:
+              </span>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Click <strong>"Auto-Assign Mailboxes"</strong>. Your 20 Google Workspace addresses are partitioned across the 3 account agents in round-robin fashion so each agent has dedicated sender addresses.
+              </p>
+            </div>
+
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="bar-chart-2" class="w-4 h-4 text-purple-400"></i>
+                4. Team Pulse Live Monitoring:
+              </span>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Click <strong>"Team Pulse"</strong> to see live agent metrics: number of assigned customers, connected mailboxes, pending unread conversation threads, and emails sent today.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: AGENT PLAYBOOK -->
+        <div x-show="guideTab === 'agent'" class="space-y-4">
+          <div class="p-4 bg-sky-950/40 border border-sky-800/40 rounded-xl space-y-1">
+            <h4 class="font-bold text-sky-300 text-sm flex items-center gap-1.5">
+              <i data-lucide="user-check" class="w-4 h-4"></i> Agent Playbook (Max, Fred, Chriss):
+            </h4>
+            <p class="text-slate-300 text-[11px] leading-relaxed">
+              Designed to make your day fast, efficient, and profitable. You can claim leads, send personalized emails in 1 click, and reply in real-time.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="filter" class="w-4 h-4 text-sky-400"></i>
+                1. How to find &amp; claim leads:
+              </span>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Open <strong class="text-white">Customers</strong>. In the status dropdown, choose <strong class="text-sky-300">"🗂 Unassigned Pool (Take Leads)"</strong>. These are fresh customers not yet managed by anyone. Click <strong class="text-sky-300">+ Claim</strong> to claim them, or <strong class="text-emerald-300">⚡ Send</strong> to claim and message simultaneously.
+              </p>
+            </div>
+
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i>
+                2. 4 Proven B2C Templates Available in 1-Click:
+              </span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                <div class="p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                  <span class="font-bold text-amber-300 block">👑 VIP Concierge Intro:</span>
+                  <span class="text-slate-400">Direct personal host introduction, bespoke weekly reload perks, and priority processing.</span>
+                </div>
+                <div class="p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                  <span class="font-bold text-emerald-300 block">🎁 Win-Back Bonus:</span>
+                  <span class="text-slate-400">Special return gift and deposit match bonus for players who haven't logged in recently.</span>
+                </div>
+                <div class="p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                  <span class="font-bold text-purple-300 block">⭐ VIP Tier Upgrade:</span>
+                  <span class="text-slate-400">Notification of account status increase with higher withdrawal limits and personal host.</span>
+                </div>
+                <div class="p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                  <span class="font-bold text-sky-300 block">💬 1-on-1 VIP Check-In:</span>
+                  <span class="text-slate-400">Relationship building, player experience check, and quick satisfaction feedback.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="inbox" class="w-4 h-4 text-sky-400"></i>
+                3. Unified Inbox Routine:
+              </span>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                Check the <strong class="text-white">Inbox tab</strong> throughout the day. When a customer replies, click their conversation. Use the <strong class="text-amber-300">Quick Reply Chips</strong> (VIP Reload, Win-Back Bonus, Payout Priority, Concierge Check-In) to auto-fill your message, then click <strong class="text-sky-300">Send Reply</strong>!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: DELIVERABILITY & GOOGLE WORKSPACE -->
+        <div x-show="guideTab === 'deliverability'" class="space-y-4">
+          <div class="p-4 bg-emerald-950/40 border border-emerald-800/40 rounded-xl space-y-1">
+            <h4 class="font-bold text-emerald-300 text-sm flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-4 h-4"></i> 20 Google Workspace Accounts Strategy (Variant B):
+            </h4>
+            <p class="text-slate-300 text-[11px] leading-relaxed">
+              Why use 20 Google Workspace mailboxes? By spreading your email dispatches across 20 distinct paid Google Workspace accounts, no individual mailbox exceeds 50–100 emails/day. This ensures 99%+ primary inbox placement and protects your sending domain.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="key" class="w-4 h-4 text-amber-400"></i>
+                Step-by-Step: How to Generate a Google App Password (Required for SMTP):
+              </span>
+              <ol class="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300 leading-relaxed">
+                <li>Log in to your Google Workspace account and go to <a href="https://myaccount.google.com/security" target="_blank" class="text-blue-400 underline font-semibold">myaccount.google.com/security &nearr;</a></li>
+                <li>Make sure <strong class="text-white">2-Step Verification</strong> is turned <span class="text-emerald-400 font-bold">ON</span>.</li>
+                <li>Open <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-amber-400 underline font-semibold">myaccount.google.com/apppasswords &nearr;</a></li>
+                <li>Enter App name: <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">FiveNights CRM</code> and click <strong>Create</strong>.</li>
+                <li>Google will show a <strong>16-letter App Password</strong> (e.g. <code class="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-300 font-mono">abcd efgh ijkl mnop</code>). Copy and paste this into the CRM!</li>
+              </ol>
+              <div class="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-[10px] text-slate-400">
+                ⚠️ <strong>Do NOT use your normal Google login password!</strong> Google blocks normal passwords on direct SMTP connections for security. Only the 16-character App Password is accepted.
+              </div>
+            </div>
+
+            <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1.5">
+              <span class="font-bold text-white text-xs flex items-center gap-2">
+                <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+                Bulk Connect Syntax:
+              </span>
+              <p class="text-slate-400 text-[11px]">
+                In the Mailboxes tab, click <strong>"Bulk Connect"</strong> and paste all accounts in this format (1 per line):
+              </p>
+              <pre class="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-amber-300 font-mono text-[11px] overflow-x-auto">outreach1@fivenights.fun : abcd efgh ijkl mnop : Max
+outreach2@fivenights.fun : qwer tyui opas dfgh : Fred
+outreach3@fivenights.fun : zxcv bnmq wert yuiop : Chriss
+admin@fivenights.fun : asdf ghjk lzxc vbnm : John</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 5: FAQ -->
+        <div x-show="guideTab === 'faq'" class="space-y-3">
+          <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+            <span class="font-bold text-white text-xs flex items-center gap-1.5">
+              <i data-lucide="help-circle" class="w-3.5 h-3.5 text-purple-400"></i>
+              What is the default login password?
+            </span>
+            <p class="text-slate-400 text-[11px] leading-relaxed">
+              The default password for all 4 accounts (John, Max, Fred, Chriss) is <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">347581</code>. You can also click your profile button on the login screen for 1-click instant login!
+            </p>
+          </div>
+
+          <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+            <span class="font-bold text-white text-xs flex items-center gap-1.5">
+              <i data-lucide="help-circle" class="w-3.5 h-3.5 text-purple-400"></i>
+              Why can't I edit another agent's notes?
+            </span>
+            <p class="text-slate-400 text-[11px] leading-relaxed">
+              To prevent accidental overwrites and maintain clear audit trails, agents can only edit notes they personally authored. John (Admin) has master permission to edit or delete any note.
+            </p>
+          </div>
+
+          <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+            <span class="font-bold text-white text-xs flex items-center gap-1.5">
+              <i data-lucide="help-circle" class="w-3.5 h-3.5 text-purple-400"></i>
+              What is Simulation (Dry-Run) mode?
+            </span>
+            <p class="text-slate-400 text-[11px] leading-relaxed">
+              In Settings, when <strong class="text-amber-300">Simulation</strong> mode is active, the entire campaign flow (template rendering, variables, anti-spam delay calculations) runs without dispatching live emails. When you are ready for real delivery, toggle it to <strong class="text-emerald-300">Live</strong>.
+            </p>
+          </div>
+
+          <div class="p-3.5 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+            <span class="font-bold text-white text-xs flex items-center gap-1.5">
+              <i data-lucide="help-circle" class="w-3.5 h-3.5 text-purple-400"></i>
+              How do I switch which agent profile I am sending from?
+            </span>
+            <p class="text-slate-400 text-[11px] leading-relaxed">
+              Click your agent badge in the top right header, or go to the <strong class="text-white">Agents tab</strong> and click <strong class="text-purple-300">"Select Profile"</strong> on any agent card.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800 shrink-0">
+        <span class="text-[11px] text-slate-500">Need more assistance? Check with John (Admin).</span>
+        <button type="button" @click="guideModalOpen = false" class="btn btn-primary text-xs px-4 py-1.5">
+          Got It, Close Handbook
+        </button>
+      </div>
+
+    </div>
   </div>
- 
+
   <script>
     // Initialize Lucide icons on load
     document.addEventListener("DOMContentLoaded", () => {

@@ -1,4 +1,4 @@
-﻿name: Deploy CRM to Firebase Hosting
+name: Deploy CRM to Firebase Hosting
 
 on:
   push:
@@ -11,7 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Firebase Secret
+        id: check_secret
+        run: |
+          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT_FIVENIGHTS_FUN_CRM }}" ]; then
+            echo "has_secret=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_secret=false" >> $GITHUB_OUTPUT
+            echo "FIREBASE_SERVICE_ACCOUNT_FIVENIGHTS_FUN_CRM secret not configured in GitHub repository. Deployments are done via local authenticated CLI."
+          fi
+
       - name: Deploy to Firebase Hosting
+        if: steps.check_secret.outputs.has_secret == 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
