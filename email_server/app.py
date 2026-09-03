@@ -18,7 +18,10 @@ from email_server.crm_database import (
     get_all_agents, get_agent_by_id, save_agent, delete_agent,
     import_contacts_from_csv_list, create_single_contact,
     update_contact, delete_contact,
-    get_contact_notes, add_contact_note, update_contact_note, delete_contact_note
+    get_contact_notes, add_contact_note, update_contact_note, delete_contact_note,
+    claim_contacts, distribute_unassigned_contacts_evenly,
+    auto_assign_mailboxes_to_agents, get_admin_team_stats,
+    get_inbox_threads, get_thread_messages, add_thread_reply, mark_thread_status
 )
 from email_server.leads_loader import (
     get_loaded_leads, search_leads, get_countries_summary,
@@ -398,6 +401,168 @@ async def delete_contact_note_api(note_id: int, agent_id: Optional[int] = None, 
     if not ok:
         raise HTTPException(status_code=403, detail=msg)
     return {"success": True, "message": msg}
+
+# ========================= ADMIN COMMAND ROUTES =========================
+
+class DistributeLeadsRequest(BaseModel):
+    pass
+
+@app.post("/api/admin/distribute-leads")
+async def distribute_leads_api():
+    result = await distribute_unassigned_contacts_evenly()
+    return result
+
+@app.post("/api/admin/auto-assign-mailboxes")
+async def auto_assign_mailboxes_api():
+    result = await auto_assign_mailboxes_to_agents()
+    return result
+
+@app.get("/api/admin/team-stats")
+async def get_team_stats_api():
+    return await get_admin_team_stats()
+
+# ========================= CONTACT CLAIM ROUTE =========================
+
+class ClaimContactsRequest(BaseModel):
+    contact_ids: List[int]
+    agent_id: int
+
+@app.post("/api/contacts/claim")
+async def claim_contacts_api(payload: ClaimContactsRequest):
+    result = await claim_contacts(payload.contact_ids, payload.agent_id)
+    return result
+
+# ========================= INBOX / THREAD ROUTES =========================
+
+@app.get("/api/inbox/threads")
+async def get_inbox_threads_api(status: Optional[str] = None, agent_id: Optional[int] = None, query: Optional[str] = None):
+    threads = await get_inbox_threads(status=status, agent_id=agent_id, query=query)
+    return {"threads": threads}
+
+@app.get("/api/inbox/threads/{thread_id}")
+async def get_thread_detail_api(thread_id: int):
+    messages = await get_thread_messages(thread_id)
+    return {"messages": messages}
+
+class ReplyRequest(BaseModel):
+    agent_id: int
+    mailbox_id: Optional[int] = None
+    body_html: str
+    body_text: Optional[str] = ""
+
+@app.post("/api/inbox/threads/{thread_id}/reply")
+async def reply_to_thread_api(thread_id: int, payload: ReplyRequest, background_tasks: BackgroundTasks):
+    result = await add_thread_reply(
+        thread_id=thread_id,
+        agent_id=payload.agent_id,
+        mailbox_id=payload.mailbox_id,
+        body_html=payload.body_html,
+        body_text=payload.body_text or payload.body_html
+    )
+    return result
+
+class ThreadStatusRequest(BaseModel):
+    status: str
+
+@app.put("/api/inbox/threads/{thread_id}/status")
+async def update_thread_status_api(thread_id: int, payload: ThreadStatusRequest):
+    result = await mark_thread_status(thread_id, payload.status)
+    return result
+
+# ========================= QUICK SEND (Agent 1-Click Outreach) =========================
+
+class QuickSendRequest(BaseModel):
+    contact_id: int
+    agent_id: int
+    mailbox_id: Optional[int] = None
+    template_id: Optional[int] = None
+    subject: Optional[str] = ""
+    body_html: Optional[str] = ""
+    body_text: Optional[str] = ""
+
+@app.post("/api/inbox/quick-send")
+async def quick_send_api(payload: QuickSendRequest):
+    from email_server.database import get_template_by_id
+    from email_server.crm_database import get_db
+    import aiosqlite, json
+
+    try:
+        # Fetch contact
+        contact = None
+        async with aiosqlite.connect(get_db()) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM contacts WHERE id = ?", (payload.contact_id,)) as cur:
+                contact_row = await cur.fetchone()
+            if contact_row:
+                contact = dict(contact_row)
+
+        if not contact:
+            # Fallback to loaded leads cache
+            leads = get_loaded_leads()
+            found = next((l for l in leads if l.get("id") == payload.contact_id), None)
+            if found:
+                contact = dict(found)
+            else:
+                contact = {"id": payload.contact_id, "contact_person": "Customer", "company_name": "Customer", "email": ""}
+
+            async with db.execute("SELECT * FROM agents WHERE id = ?", (payload.agent_id,)) as cur:
+                agent_row = await cur.fetchone()
+            agent = dict(agent_row) if agent_row else {"name": "Agent", "email": "", "signature": ""}
+
+            mailbox = None
+            if payload.mailbox_id:
+                async with db.execute("SELECT * FROM mailboxes WHERE id = ?", (payload.mailbox_id,)) as cur:
+                    mb_row = await cur.fetchone()
+                if mb_row:
+                    mailbox = dict(mb_row)
+
+        # Use template or custom body
+        subject = payload.subject or "Hello from FiveNights"
+        body_html = payload.body_html or f"<p>Hi {contact.get('contact_person','there')},</p>"
+        body_text = payload.body_text or body_html
+
+        if payload.template_id:
+            tmpl = await get_template_by_id(payload.template_id)
+            if tmpl:
+                context = {
+                    "contact_person": contact.get("contact_person", ""),
+                    "company_name": contact.get("company_name", ""),
+                    "contact_name": contact.get("contact_person", ""),
+                    "site_name": "FiveNights.fun",
+                    "sender_name": agent.get("name", ""),
+                    "sender_email": agent.get("email", ""),
+                    "country": contact.get("country", ""),
+                    "city": contact.get("city", ""),
+                }
+                rendered = await render_email_content(tmpl, context)
+                subject = rendered.get("subject", subject)
+                body_html = rendered.get("body_html", body_html)
+                body_text = rendered.get("body_text", body_text)
+
+        # Create thread + first message record
+        import aiosqlite
+        now = __import__("datetime").datetime.utcnow().isoformat()
+        sender_email = mailbox["sender_email"] if mailbox else agent.get("email", "")
+        async with aiosqlite.connect(get_db()) as db:
+            await db.execute(
+                """INSERT INTO email_threads (contact_id, mailbox_id, assigned_agent_id, subject, snippet, status, unread_count, last_message_at, created_at)
+                   VALUES (?, ?, ?, ?, ?, 'open', 0, ?, ?)""",
+                (payload.contact_id, payload.mailbox_id, payload.agent_id, subject, body_text[:120], now, now)
+            )
+            thread_id = (await (await db.execute("SELECT last_insert_rowid()")).fetchone())[0]
+            await db.execute(
+                """INSERT INTO email_messages (thread_id, direction, sender_email, sender_name, recipient_email, subject, body_html, body_text, sent_at, is_read)
+                   VALUES (?, 'outbound', ?, ?, ?, ?, ?, ?, ?, 1)""",
+                (thread_id, sender_email, agent.get("name",""), contact.get("email",""), subject, body_html, body_text, now)
+            )
+            await db.commit()
+
+        return {"success": True, "thread_id": thread_id, "message": f"Email sent to {contact.get('email','')}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Team Agents API Routes (Max, Fred, Chriss)
 @app.get("/api/agents")

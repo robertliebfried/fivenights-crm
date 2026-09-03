@@ -245,6 +245,93 @@ async def init_crm_db():
                 VALUES (?, ?, ?, ?, ?, ?, 1)
             """, ag)
 
+        # 9. Unified Inbox: Email Threads Table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS email_threads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contact_id INTEGER NOT NULL,
+                mailbox_id INTEGER DEFAULT 1,
+                assigned_agent_id INTEGER DEFAULT 2,
+                subject TEXT NOT NULL,
+                snippet TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'unread', -- unread, open, replied, closed
+                unread_count INTEGER DEFAULT 1,
+                last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+                FOREIGN KEY (mailbox_id) REFERENCES mailboxes(id) ON DELETE SET NULL,
+                FOREIGN KEY (assigned_agent_id) REFERENCES agents(id) ON DELETE SET NULL
+            );
+        """)
+
+        # 10. Unified Inbox: Email Messages Table
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS email_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                thread_id INTEGER NOT NULL,
+                direction TEXT NOT NULL DEFAULT 'inbound', -- inbound, outbound
+                sender_email TEXT NOT NULL,
+                sender_name TEXT NOT NULL,
+                recipient_email TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                body_html TEXT NOT NULL,
+                body_text TEXT NOT NULL,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_read BOOLEAN DEFAULT 0,
+                FOREIGN KEY (thread_id) REFERENCES email_threads(id) ON DELETE CASCADE
+            );
+        """)
+
+        # Seed initial realistic customer threads if empty
+        async with db.execute("SELECT COUNT(*) FROM email_threads") as c:
+            thread_count = (await c.fetchone())[0]
+            if thread_count == 0:
+                seed_threads = [
+                    (
+                        1, 1, 2, "Re: Exclusive VIP privileges for Alex Miller", 
+                        "Hey Max! Thanks for reaching out. What are the deposit limits for VIP Gold and how do I activate the reload?",
+                        "unread", 1, "alex.miller92@gmail.com", "Alex Miller", "max@fivenights.fun",
+                        "<p>Hey Max,</p><p>Thanks for reaching out! I saw your email regarding VIP concierge access.</p><p>What are the reload bonus conditions and deposit limits for VIP Gold? Can you activate the cashback on my profile?</p><p>Best,<br>Alex</p>",
+                        "Hey Max, Thanks for reaching out! What are the reload bonus conditions and deposit limits for VIP Gold? Can you activate the cashback on my profile? Best, Alex"
+                    ),
+                    (
+                        2, 2, 3, "Re: We miss you, Sophie - an exclusive return perk is waiting",
+                        "Hi Fred, is this welcome back bonus still valid if I log in tonight? Thanks!",
+                        "unread", 1, "sophie.laurent@yahoo.fr", "Sophie Laurent", "fred@fivenights.fun",
+                        "<p>Hi Fred,</p><p>Just saw your email! Is the welcome back match bonus still valid if I log in tonight? Appreciate the check-in.</p><p>Thanks,<br>Sophie</p>",
+                        "Hi Fred, Just saw your email! Is the welcome back match bonus still valid if I log in tonight? Appreciate the check-in. Thanks, Sophie"
+                    ),
+                    (
+                        3, 3, 4, "Question about account verification & withdrawals",
+                        "Hello Chriss, my crypto withdrawal went through quickly yesterday, thanks! Can I increase weekly limit?",
+                        "open", 0, "david.becker@protonmail.com", "David Becker", "chriss@fivenights.fun",
+                        "<p>Hello Chriss,</p><p>My withdrawal went through in under 15 minutes yesterday, very impressive! I wanted to check if you can increase my weekly limit as a regular player?</p><p>Regards,<br>David</p>",
+                        "Hello Chriss, My withdrawal went through in under 15 minutes yesterday, very impressive! I wanted to check if you can increase my weekly limit as a regular player? Regards, David"
+                    ),
+                    (
+                        4, 4, 2, "Re: Quick question about your FiveNights experience",
+                        "Great experience overall, love the new interface. Would be great to add more live tournaments!",
+                        "replied", 0, "marco.rossi@outlook.it", "Marco Rossi", "max@fivenights.fun",
+                        "<p>Hi Max,</p><p>Overall loving the speed of the site and the new games! My only suggestion would be more weekend live tournaments.</p><p>Cheers,<br>Marco</p>",
+                        "Hi Max, Overall loving the speed of the site and the new games! My only suggestion would be more weekend live tournaments. Cheers, Marco"
+                    )
+                ]
+                for st in seed_threads:
+                    cur = await db.execute("""
+                        INSERT INTO email_threads (
+                            contact_id, mailbox_id, assigned_agent_id, subject, snippet,
+                            status, unread_count, last_message_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """, (st[0], st[1], st[2], st[3], st[4], st[5], st[6]))
+                    th_id = cur.lastrowid
+                    await db.execute("""
+                        INSERT INTO email_messages (
+                            thread_id, direction, sender_email, sender_name, recipient_email,
+                            subject, body_html, body_text, sent_at, is_read
+                        ) VALUES (?, 'inbound', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+                    """, (th_id, st[7], st[8], st[9], st[3], st[10], st[11], 0 if st[5] == 'unread' else 1))
+
         await db.commit()
 
 # CRM Contact CRUD Operations
@@ -891,5 +978,232 @@ async def import_contacts_from_csv_list(contacts: list, default_tags: str = "csv
         await db.commit()
         return {"imported": imported, "updated": updated, "total": imported + updated}
 
+# ==========================================
+# Admin Platform Management & Lead Claiming
+# ==========================================
+async def claim_contacts(contact_ids: list, agent_id: int):
+    """Assign selected contacts from the pool to a specific agent"""
+    if not contact_ids:
+        return 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        placeholders = ",".join("?" for _ in contact_ids)
+        await db.execute(f"""
+            UPDATE contacts 
+            SET assigned_agent_id = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id IN ({placeholders})
+        """, [agent_id] + list(contact_ids))
+        await db.commit()
+        return len(contact_ids)
 
+async def distribute_unassigned_contacts_evenly():
+    """Round-robin distribute all unassigned leads across active outreach agents (Max, Fred, Chriss, John)"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        
+        # Get active agents
+        async with db.execute("SELECT id, name FROM agents WHERE is_active = 1 ORDER BY id ASC") as cur:
+            agents = [dict(r) for r in await cur.fetchall()]
+        
+        if not agents:
+            return {"distributed": 0, "message": "No active agents found"}
 
+        # Outreach agents preferred (Max, Fred, Chriss)
+        outreach_agents = [a for a in agents if a["name"] != "John"]
+        target_agents = outreach_agents if outreach_agents else agents
+
+        # Get unassigned contacts
+        async with db.execute("SELECT id FROM contacts WHERE assigned_agent_id IS NULL OR assigned_agent_id = 0 ORDER BY id ASC") as cur:
+            unassigned_ids = [r[0] for r in await cur.fetchall()]
+
+        if not unassigned_ids:
+            return {"distributed": 0, "message": "No unassigned leads in pool"}
+
+        distributed = 0
+        for i, cid in enumerate(unassigned_ids):
+            assigned = target_agents[i % len(target_agents)]
+            await db.execute("UPDATE contacts SET assigned_agent_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (assigned["id"], cid))
+            distributed += 1
+
+        await db.commit()
+        return {"distributed": distributed, "agents_count": len(target_agents)}
+
+async def auto_assign_mailboxes_to_agents():
+    """Evenly distribute 20 Google Workspace mailboxes to the 4 team agents (5 per agent)"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT id, name FROM agents WHERE is_active = 1 ORDER BY id ASC") as cur:
+            agents = [dict(r) for r in await cur.fetchall()]
+        
+        async with db.execute("SELECT id FROM mailboxes ORDER BY id ASC") as cur:
+            mailboxes = [r[0] for r in await cur.fetchall()]
+
+        if not agents or not mailboxes:
+            return {"assigned": 0}
+
+        assigned_count = 0
+        for i, m_id in enumerate(mailboxes):
+            ag = agents[i % len(agents)]
+            await db.execute("UPDATE mailboxes SET assigned_agent_id = ? WHERE id = ?", (ag["id"], m_id))
+            assigned_count += 1
+
+        await db.commit()
+        return {"assigned": assigned_count, "agents_count": len(agents)}
+
+async def get_admin_team_stats():
+    """Retrieve at-a-glance workload and performance metrics per agent"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        sql = """
+            SELECT a.id, a.name, a.email, a.role, a.avatar_color,
+                   COUNT(DISTINCT c.id) as assigned_customers,
+                   COALESCE(SUM(c.deal_value), 0) as portfolio_value,
+                   (SELECT COUNT(*) FROM mailboxes m WHERE m.assigned_agent_id = a.id) as mailboxes_count,
+                   (SELECT COUNT(*) FROM email_threads t WHERE t.assigned_agent_id = a.id AND t.status = 'unread') as unread_threads,
+                   (SELECT COUNT(*) FROM campaign_leads cl 
+                    JOIN campaigns cp ON cl.campaign_id = cp.id 
+                    WHERE cl.status = 'sent' AND DATE(cl.sent_at) = DATE('now')) as sent_today
+            FROM agents a
+            LEFT JOIN contacts c ON c.assigned_agent_id = a.id
+            WHERE a.is_active = 1
+            GROUP BY a.id
+            ORDER BY a.id ASC
+        """
+        async with db.execute(sql) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+# ==========================================
+# Unified Inbox & Messaging Operations
+# ==========================================
+async def get_inbox_threads(status: str = "All", agent_id: int = None, query: str = ""):
+    """Fetch unified inbox conversation threads with customer context"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        sql = """
+            SELECT t.*, 
+                   COALESCE(c.contact_person, c.company_name, 'Customer') as contact_name,
+                   c.contact_person as customer_name,
+                   c.company_name as customer_username,
+                   COALESCE(c.email, '') as contact_email,
+                   c.phone as contact_phone,
+                   c.country as contact_country,
+                   c.tags as contact_tags,
+                   c.relevance as customer_tier,
+                   c.deal_value as customer_ltv,
+                   c.tags as customer_tags,
+                   c.notes as customer_notes,
+                   a.name as assigned_agent_name,
+                   a.avatar_color as assigned_agent_color,
+                   m.name as mailbox_name,
+                   m.sender_email as mailbox_email
+            FROM email_threads t
+            LEFT JOIN contacts c ON t.contact_id = c.id
+            LEFT JOIN agents a ON t.assigned_agent_id = a.id
+            LEFT JOIN mailboxes m ON t.mailbox_id = m.id
+            WHERE 1=1
+        """
+        params = []
+        if status and status != "All":
+            if status.lower() == "unread":
+                sql += " AND t.status = 'unread'"
+            elif status.lower() == "needs_reply":
+                sql += " AND t.status IN ('unread', 'open')"
+            elif status.lower() == "vips":
+                sql += " AND (c.tags LIKE '%vip%' OR c.relevance LIKE '%vip%')"
+            else:
+                sql += " AND t.status = ?"
+                params.append(status.lower())
+
+        if agent_id:
+            sql += " AND (t.assigned_agent_id = ? OR t.assigned_agent_id IS NULL)"
+            params.append(agent_id)
+
+        if query:
+            sql += " AND (t.subject LIKE ? OR t.snippet LIKE ? OR c.contact_person LIKE ? OR c.email LIKE ?)"
+            q_like = f"%{query}%"
+            params.extend([q_like, q_like, q_like, q_like])
+
+        sql += " ORDER BY t.last_message_at DESC, t.id DESC"
+
+        async with db.execute(sql, params) as cur:
+            threads = [dict(r) for r in await cur.fetchall()]
+            return threads
+
+async def get_thread_messages(thread_id: int):
+    """Retrieve full chronological message history for a conversation thread"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Mark thread as read
+        await db.execute("UPDATE email_threads SET status = CASE WHEN status = 'unread' THEN 'open' ELSE status END, unread_count = 0 WHERE id = ?", (thread_id,))
+        await db.execute("UPDATE email_messages SET is_read = 1 WHERE thread_id = ?", (thread_id,))
+        await db.commit()
+
+        async with db.execute("""
+            SELECT * FROM email_messages 
+            WHERE thread_id = ? 
+            ORDER BY sent_at ASC, id ASC
+        """, (thread_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+async def add_thread_reply(thread_id: int, agent_id: int, mailbox_id: int, body_html: str, body_text: str):
+    """Record outbound agent reply and update conversation status to 'replied'"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        
+        # Get thread and contact details
+        async with db.execute("""
+            SELECT t.*, c.email as customer_email, c.contact_person as customer_name,
+                   a.name as agent_name, a.email as agent_email
+            FROM email_threads t
+            LEFT JOIN contacts c ON t.contact_id = c.id
+            LEFT JOIN agents a ON a.id = ?
+            WHERE t.id = ?
+        """, (agent_id, thread_id)) as cur:
+            row = await cur.fetchone()
+            if not row:
+                return False, "Thread not found"
+            th = dict(row)
+
+        sender_email = th.get("agent_email") or "support@fivenights.fun"
+        sender_name = th.get("agent_name") or "Account Concierge"
+        recipient_email = th.get("customer_email") or ""
+        subject = th.get("subject", "Re: Customer Inquiry")
+        if not subject.lower().startswith("re:"):
+            subject = f"Re: {subject}"
+
+        snippet = (body_text or body_html)[:120].strip()
+
+        # Insert outbound message
+        cur = await db.execute("""
+            INSERT INTO email_messages (
+                thread_id, direction, sender_email, sender_name, recipient_email,
+                subject, body_html, body_text, sent_at, is_read
+            ) VALUES (?, 'outbound', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 1)
+        """, (thread_id, sender_email, sender_name, recipient_email, subject, body_html, body_text))
+        
+        # Update thread state
+        await db.execute("""
+            UPDATE email_threads SET
+                status = 'replied',
+                snippet = ?,
+                mailbox_id = COALESCE(?, mailbox_id),
+                assigned_agent_id = COALESCE(?, assigned_agent_id),
+                last_message_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (snippet, mailbox_id, agent_id, thread_id))
+        
+        await db.commit()
+        return True, "Reply recorded"
+
+async def mark_thread_status(thread_id: int, status: str):
+    """Update status of a thread ('open', 'replied', 'closed', 'unread')"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE email_threads SET
+                status = ?,
+                unread_count = CASE WHEN ? = 'unread' THEN 1 ELSE 0 END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (status.lower(), status.lower(), thread_id))
+        await db.commit()
+        return True
