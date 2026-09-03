@@ -16,7 +16,7 @@ from email_server.crm_database import (
     init_crm_db, get_all_mailboxes, get_mailbox_by_id,
     save_mailbox, delete_mailbox, import_reengagement_clients,
     get_all_agents, get_agent_by_id, save_agent, delete_agent,
-    import_contacts_from_csv_list
+    import_contacts_from_csv_list, create_single_contact
 )
 from email_server.leads_loader import (
     get_loaded_leads, search_leads, get_countries_summary,
@@ -70,6 +70,21 @@ class CSVImportModel(BaseModel):
     contacts: List[dict]
     default_tags: Optional[str] = "csv_import"
     assigned_agent_id: Optional[int] = None
+
+class SingleContactModel(BaseModel):
+    name: Optional[str] = ""
+    contact_person: Optional[str] = ""
+    company: Optional[str] = ""
+    company_name: Optional[str] = ""
+    email: str
+    phone: Optional[str] = ""
+    country: Optional[str] = "Global"
+    city: Optional[str] = ""
+    deal_value: Optional[float] = 0.0
+    notes: Optional[str] = ""
+    tags: Optional[str] = "manual_entry"
+    assigned_agent_id: Optional[int] = None
+    stage_id: Optional[int] = 1
 
 class ReengagementImportModel(BaseModel):
     clients: List[dict]
@@ -331,6 +346,12 @@ async def import_contacts_csv_api(payload: CSVImportModel):
         assigned_agent_id=payload.assigned_agent_id
     )
     return {"success": True, **res}
+
+# Single Contact Manual Creation Route (Agents & Admin)
+@app.post("/api/contacts")
+async def create_single_contact_api(payload: SingleContactModel):
+    contact_id = await create_single_contact(payload.model_dump())
+    return {"success": True, "contact_id": contact_id}
 
 # Team Agents API Routes (Max, Fred, Chriss)
 @app.get("/api/agents")

@@ -349,6 +349,45 @@ async def add_contact_note(contact_id: int, content: str, author: str = "You"):
         await db.execute("UPDATE contacts SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (contact_id,))
         await db.commit()
 
+async def create_single_contact(data: dict):
+    """Manually add a single lead/contact by an agent or admin"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        email = (data.get("email") or "").strip()
+        name = (data.get("name") or data.get("contact_person") or "").strip()
+        company = (data.get("company") or data.get("company_name") or name or "Private Client").strip()
+        phone = (data.get("phone") or "").strip()
+        country = (data.get("country") or "Global").strip()
+        city = (data.get("city") or "").strip()
+        try:
+            deal_value = float(data.get("deal_value") or 0.0)
+        except (ValueError, TypeError):
+            deal_value = 0.0
+        notes = (data.get("notes") or "").strip()
+        tags = (data.get("tags") or "manual_entry").strip()
+        
+        raw_agent = data.get("assigned_agent_id")
+        if raw_agent in ("", "none", 0, "0", None):
+            assigned_agent_id = None
+        else:
+            try:
+                assigned_agent_id = int(raw_agent)
+            except (ValueError, TypeError):
+                assigned_agent_id = None
+
+        try:
+            stage_id = int(data.get("stage_id") or 1)
+        except (ValueError, TypeError):
+            stage_id = 1
+
+        cursor = await db.execute("""
+            INSERT INTO contacts (
+                company_name, contact_person, email, phone, country, city,
+                stage_id, deal_value, notes, tags, assigned_agent_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (company, name, email, phone, country, city, stage_id, deal_value, notes, tags, assigned_agent_id))
+        await db.commit()
+        return cursor.lastrowid
+
 async def import_leads_to_crm(leads: list, target_stage_id: int = 1):
     async with aiosqlite.connect(DB_PATH) as db:
         imported_count = 0

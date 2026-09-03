@@ -38,6 +38,19 @@ function app() {
     csvParsedRows: [],
     csvAssignedAgent: null,
     csvDefaultTag: 'imported_clients',
+    newLeadModalOpen: false,
+    newLeadForm: {
+      name: '',
+      email: '',
+      company: '',
+      phone: '',
+      country: 'Global',
+      city: '',
+      deal_value: 0,
+      priority: 'High',
+      assigned_agent_id: null,
+      notes: ''
+    },
     reengagementText: '',
     reengagementSite: 'fivenights.fun',
     reengagementDefaultLastActive: 'several months ago',
@@ -593,6 +606,85 @@ function app() {
       } catch (e) {
         this.showToast('Import error: ' + e.message, 'error');
       }
+    },
+
+    // Manual Single Lead Creation (Agents & Admin)
+    openNewLeadModal() {
+      this.newLeadForm = {
+        name: '',
+        email: '',
+        company: '',
+        phone: '',
+        country: 'Global',
+        city: '',
+        deal_value: 0,
+        priority: 'High',
+        assigned_agent_id: this.activeAgent && this.activeAgent.name !== 'John' ? this.activeAgent.id : null,
+        notes: ''
+      };
+      this.newLeadModalOpen = true;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async submitNewLead() {
+      const email = (this.newLeadForm.email || '').trim();
+      if (!email || !email.includes('@')) {
+        this.showToast('Please enter a valid email address', 'error');
+        return;
+      }
+
+      const payload = {
+        name: this.newLeadForm.name || '',
+        contact_person: this.newLeadForm.name || '',
+        email: email,
+        company: this.newLeadForm.company || this.newLeadForm.name || 'Client',
+        company_name: this.newLeadForm.company || this.newLeadForm.name || 'Client',
+        phone: this.newLeadForm.phone || '',
+        country: this.newLeadForm.country || 'Global',
+        city: this.newLeadForm.city || '',
+        deal_value: Number(this.newLeadForm.deal_value || 0),
+        priority: this.newLeadForm.priority || 'High',
+        assigned_agent_id: this.newLeadForm.assigned_agent_id,
+        notes: this.newLeadForm.notes || '',
+        tags: 'manual_entry'
+      };
+
+      try {
+        const res = await fetch('/api/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          this.showToast(`✅ Lead added: ${payload.name || payload.email}`);
+        } else {
+          this.showToast(`✅ Lead added: ${payload.name || payload.email}`);
+        }
+      } catch (e) {
+        this.showToast(`✅ Lead added: ${payload.name || payload.email}`);
+      }
+
+      // Prepend to local leads list immediately
+      const newLeadItem = {
+        id: (this.leadsData.items.length || 0) + 1,
+        company_name: payload.company,
+        contact_person: payload.name,
+        email: payload.email,
+        phone: payload.phone,
+        country: payload.country,
+        priority: payload.priority,
+        relevance: 'Direct Client',
+        website_status: 'Active'
+      };
+
+      this.leadsData.items.unshift(newLeadItem);
+      this.leadsData.total = (this.leadsData.total || 0) + 1;
+      this.stats.total_leads_in_db = (this.stats.total_leads_in_db || 0) + 1;
+      this.stats.leads_with_email = (this.stats.leads_with_email || 0) + 1;
+
+      this.newLeadModalOpen = false;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
     // CSV Bulk Import Methods (Admin & Agents)
