@@ -60,11 +60,18 @@ async def init_crm_db():
                 deal_value REAL DEFAULT 0.0,
                 notes TEXT DEFAULT '',
                 tags TEXT DEFAULT '',
+                assigned_agent_id INTEGER DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (stage_id) REFERENCES pipeline_stages(id)
+                FOREIGN KEY (stage_id) REFERENCES pipeline_stages(id),
+                FOREIGN KEY (assigned_agent_id) REFERENCES agents(id)
             );
         """)
+
+        try:
+            await db.execute("ALTER TABLE contacts ADD COLUMN assigned_agent_id INTEGER DEFAULT NULL")
+        except Exception:
+            pass
 
         # 3. Sequences Table
         await db.execute("""
@@ -684,5 +691,53 @@ async def delete_agent(agent_id: int):
         await db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
         await db.commit()
         return True
+
+async def import_contacts_from_csv_list(contacts: list, default_tags: str = "csv_import", assigned_agent_id: int = None):
+    """Bulk import parsed CSV contacts with deduplication and agent assignment"""
+    imported = 0
+    updated = 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        for c in contacts:
+            email = (c.get("email") or "").strip()
+            if not email or "@" not in email:
+                continue
+
+            name = (c.get("name") or c.get("contact_person") or "").strip()
+            company = (c.get("company") or c.get("company_name") or name or "Client").strip()
+            phone = (c.get("phone") or "").strip()
+            country = (c.get("country") or "").strip()
+            city = (c.get("city") or "").strip()
+            notes = (c.get("notes") or "").strip()
+            tags = (c.get("tags") or default_tags or "csv_import").strip()
+            agent_id = c.get("assigned_agent_id") or assigned_agent_id
+
+            async with db.execute("SELECT id FROM contacts WHERE email = ?", (email,)) as cur:
+                existing = await cur.fetchone()
+
+            if existing:
+                await db.execute("""
+                    UPDATE contacts SET
+                        company_name = COALESCE(NULLIF(?, ''), company_name),
+                        contact_person = COALESCE(NULLIF(?, ''), contact_person),
+                        phone = COALESCE(NULLIF(?, ''), phone),
+                        country = COALESCE(NULLIF(?, ''), country),
+                        tags = ?,
+                        assigned_agent_id = COALESCE(?, assigned_agent_id),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (company, name, phone, country, tags, agent_id, existing[0]))
+                updated += 1
+            else:
+                await db.execute("""
+                    INSERT INTO contacts (
+                        company_name, contact_person, email, phone, country, city,
+                        stage_id, notes, tags, assigned_agent_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+                """, (company, name, email, phone, country, city, notes, tags, agent_id))
+                imported += 1
+
+        await db.commit()
+        return {"imported": imported, "updated": updated, "total": imported + updated}
+
 
 

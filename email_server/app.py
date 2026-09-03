@@ -15,7 +15,8 @@ from email_server.database import (
 from email_server.crm_database import (
     init_crm_db, get_all_mailboxes, get_mailbox_by_id,
     save_mailbox, delete_mailbox, import_reengagement_clients,
-    get_all_agents, get_agent_by_id, save_agent, delete_agent
+    get_all_agents, get_agent_by_id, save_agent, delete_agent,
+    import_contacts_from_csv_list
 )
 from email_server.leads_loader import (
     get_loaded_leads, search_leads, get_countries_summary,
@@ -52,7 +53,7 @@ class AgentModel(BaseModel):
 class MailboxModel(BaseModel):
     id: Optional[int] = None
     name: str
-    smtp_host: str
+    smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: Optional[str] = ""
     smtp_password: Optional[str] = ""
@@ -60,9 +61,15 @@ class MailboxModel(BaseModel):
     smtp_use_ssl: bool = False
     sender_name: str
     sender_email: str
-    daily_limit: int = 50
+    daily_limit: int = 100
+    assigned_agent_id: Optional[int] = None
+    provider: Optional[str] = "google_workspace"
     is_active: bool = True
 
+class CSVImportModel(BaseModel):
+    contacts: List[dict]
+    default_tags: Optional[str] = "csv_import"
+    assigned_agent_id: Optional[int] = None
 
 class ReengagementImportModel(BaseModel):
     clients: List[dict]
@@ -285,8 +292,8 @@ async def get_logs_api(limit: int = 100):
 
 # 5-Domain Multi-Mailbox API Routes
 @app.get("/api/mailboxes")
-async def get_mailboxes_api():
-    return await get_all_mailboxes()
+async def get_mailboxes_api(agent_id: Optional[int] = None):
+    return await get_all_mailboxes(agent_id=agent_id)
 
 @app.get("/api/mailboxes/{mailbox_id}")
 async def get_mailbox_detail_api(mailbox_id: int):
@@ -313,6 +320,16 @@ async def delete_mailbox_api(mailbox_id: int):
 @app.post("/api/reengagement/import")
 async def import_reengagement_clients_api(payload: ReengagementImportModel):
     res = await import_reengagement_clients(payload.clients, default_site=payload.default_site or "fivenights.fun")
+    return {"success": True, **res}
+
+# CSV Leads / Contacts Bulk Import API Route
+@app.post("/api/contacts/import-csv")
+async def import_contacts_csv_api(payload: CSVImportModel):
+    res = await import_contacts_from_csv_list(
+        payload.contacts,
+        default_tags=payload.default_tags or "csv_import",
+        assigned_agent_id=payload.assigned_agent_id
+    )
     return {"success": True, **res}
 
 # Team Agents API Routes (Max, Fred, Chriss)

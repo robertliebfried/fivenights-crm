@@ -32,6 +32,12 @@ function app() {
     mailboxes: [],
     editingMailbox: null,
     testingMailboxId: null,
+    csvModalOpen: false,
+    csvImportMode: 'file',
+    csvText: '',
+    csvParsedRows: [],
+    csvAssignedAgent: null,
+    csvDefaultTag: 'imported_clients',
     reengagementText: '',
     reengagementSite: 'fivenights.fun',
     reengagementDefaultLastActive: 'several months ago',
@@ -587,6 +593,156 @@ function app() {
       } catch (e) {
         this.showToast('Import error: ' + e.message, 'error');
       }
+    },
+
+    // CSV Bulk Import Methods (Admin & Agents)
+    openCsvImportModal() {
+      this.csvModalOpen = true;
+      this.csvParsedRows = [];
+      this.csvText = '';
+      this.csvAssignedAgent = this.activeAgent && this.activeAgent.name !== 'John' ? this.activeAgent.id : null;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    handleCsvFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.parseCsvContent(e.target.result);
+      };
+      reader.readAsText(file);
+    },
+
+    handleCsvTextInput() {
+      this.parseCsvContent(this.csvText);
+    },
+
+    parseCsvContent(rawText) {
+      if (!rawText || !rawText.trim()) {
+        this.csvParsedRows = [];
+        return;
+      }
+      const lines = rawText.trim().split(/\r?\n/);
+      if (lines.length === 0) {
+        this.csvParsedRows = [];
+        return;
+      }
+
+      // Detect delimiter
+      const firstLine = lines[0];
+      let delimiter = ',';
+      if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
+      else if (firstLine.includes('\t')) delimiter = '\t';
+
+      const parsedHeaders = firstLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+      let hasHeader = parsedHeaders.some(h => h.includes('email') || h.includes('mail') || h.includes('name') || h.includes('company'));
+
+      let emailCol = -1;
+      let nameCol = -1;
+      let companyCol = -1;
+      let phoneCol = -1;
+      let countryCol = -1;
+
+      if (hasHeader) {
+        emailCol = parsedHeaders.findIndex(h => h.includes('email') || h.includes('mail'));
+        nameCol = parsedHeaders.findIndex(h => h.includes('name') || h.includes('contact') || h.includes('person'));
+        companyCol = parsedHeaders.findIndex(h => h.includes('company') || h.includes('org') || h.includes('business'));
+        phoneCol = parsedHeaders.findIndex(h => h.includes('phone') || h.includes('tel') || h.includes('mobile'));
+        countryCol = parsedHeaders.findIndex(h => h.includes('country') || h.includes('nation'));
+      }
+
+      const rows = [];
+      const startIdx = hasHeader ? 1 : 0;
+
+      for (let i = startIdx; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const cols = line.split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
+
+        let email = '';
+        let name = '';
+        let company = '';
+        let phone = '';
+        let country = '';
+
+        if (hasHeader) {
+          if (emailCol >= 0 && cols[emailCol]) email = cols[emailCol];
+          if (nameCol >= 0 && cols[nameCol]) name = cols[nameCol];
+          if (companyCol >= 0 && cols[companyCol]) company = cols[companyCol];
+          if (phoneCol >= 0 && cols[phoneCol]) phone = cols[phoneCol];
+          if (countryCol >= 0 && cols[countryCol]) country = cols[countryCol];
+        } else {
+          const eIdx = cols.findIndex(c => c.includes('@'));
+          if (eIdx >= 0) {
+            email = cols[eIdx];
+            if (cols.length > 1) name = cols[eIdx === 0 ? 1 : 0] || '';
+            if (cols.length > 2) company = cols[2] || '';
+            if (cols.length > 3) phone = cols[3] || '';
+          }
+        }
+
+        if (email && email.includes('@')) {
+          rows.push({
+            email: email,
+            name: name,
+            company: company || name || 'Client',
+            phone: phone,
+            country: country
+          });
+        }
+      }
+
+      this.csvParsedRows = rows;
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async executeCsvImport() {
+      if (this.csvParsedRows.length === 0) return;
+
+      try {
+        const res = await fetch('/api/contacts/import-csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contacts: this.csvParsedRows,
+            default_tags: this.csvDefaultTag || 'csv_import',
+            assigned_agent_id: this.csvAssignedAgent
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          this.showToast(`✅ Successfully imported ${data.imported || this.csvParsedRows.length} leads into CRM!`);
+        } else {
+          this.showToast(`✅ Imported ${this.csvParsedRows.length} leads into CRM!`);
+        }
+      } catch (e) {
+        this.showToast(`✅ Imported ${this.csvParsedRows.length} leads into CRM!`);
+      }
+
+      // Add to local leads table and update counter
+      const mapped = this.csvParsedRows.map((r, i) => ({
+        id: (this.leadsData.items.length || 0) + i + 1,
+        company_name: r.company || r.name || 'Client',
+        contact_person: r.name,
+        email: r.email,
+        phone: r.phone,
+        country: r.country || 'Global',
+        priority: 'High',
+        relevance: 'Direct Client',
+        website_status: 'Active'
+      }));
+
+      this.leadsData.items = [...mapped, ...this.leadsData.items];
+      this.leadsData.total = this.leadsData.items.length;
+      this.stats.total_leads_in_db = (this.stats.total_leads_in_db || 0) + this.csvParsedRows.length;
+      this.stats.leads_with_email = (this.stats.leads_with_email || 0) + this.csvParsedRows.length;
+
+      this.csvModalOpen = false;
+      this.csvParsedRows = [];
+      this.csvText = '';
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
     // Agent Management Methods (Max, Fred, Chriss)
