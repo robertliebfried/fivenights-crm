@@ -32,6 +32,8 @@ function app() {
     mailboxes: [],
     editingMailbox: null,
     testingMailboxId: null,
+    bulkMailboxModalOpen: false,
+    bulkMailboxText: '',
     csvModalOpen: false,
     csvImportMode: 'file',
     csvText: '',
@@ -557,6 +559,106 @@ function app() {
       this.editingMailbox.provider = 'google_workspace';
       if (!this.editingMailbox.daily_limit) this.editingMailbox.daily_limit = 100;
       this.showToast('Applied Google Workspace SMTP defaults (smtp.gmail.com:587)');
+    },
+
+    openBulkMailboxModal() {
+      this.bulkMailboxModalOpen = true;
+      this.bulkMailboxText = '';
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    async importBulkMailboxes() {
+      if (!this.bulkMailboxText.trim()) {
+        this.showToast('Please enter at least 1 account', 'error');
+        return;
+      }
+
+      const lines = this.bulkMailboxText.trim().split('\n');
+      const added = [];
+      const agentList = this.agents && this.agents.length > 0 ? this.agents : [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line || !line.includes('@')) continue;
+
+        let email = '';
+        let pass = '';
+        let agentNameOrId = null;
+
+        if (line.includes(':')) {
+          const parts = line.split(':').map(s => s.trim());
+          email = parts[0];
+          pass = parts[1] || '';
+          if (parts[2]) agentNameOrId = parts[2];
+        } else if (line.includes(',')) {
+          const parts = line.split(',').map(s => s.trim());
+          email = parts[0];
+          pass = parts[1] || '';
+          if (parts[2]) agentNameOrId = parts[2];
+        } else {
+          const parts = line.split(/\s+/).map(s => s.trim());
+          email = parts[0];
+          pass = parts.slice(1).join('');
+        }
+
+        const cleanPass = pass.replace(/\s+/g, '');
+        const cleanEmail = email.toLowerCase();
+        if (!cleanEmail) continue;
+
+        let assignedAgent = null;
+        if (agentNameOrId) {
+          assignedAgent = agentList.find(a => a.name.toLowerCase() === agentNameOrId.toLowerCase() || a.id == agentNameOrId);
+        }
+        if (!assignedAgent && agentList.length > 0) {
+          assignedAgent = agentList[i % agentList.length];
+        }
+
+        const username = cleanEmail.split('@')[0];
+        const mbName = assignedAgent ? `${assignedAgent.name} - Google Workspace (${username})` : `Google Workspace (${username})`;
+        const senderName = assignedAgent ? `${assignedAgent.name} • FiveNights` : 'FiveNights Concierge';
+
+        const mbObj = {
+          id: this.mailboxes.length + added.length + 1,
+          name: mbName,
+          smtp_host: 'smtp.gmail.com',
+          smtp_port: 587,
+          smtp_user: cleanEmail,
+          smtp_password: cleanPass,
+          smtp_use_tls: true,
+          smtp_use_ssl: false,
+          sender_name: senderName,
+          sender_email: cleanEmail,
+          daily_limit: 100,
+          sent_today: 0,
+          assigned_agent_id: assignedAgent ? assignedAgent.id : null,
+          assigned_agent_name: assignedAgent ? assignedAgent.name : null,
+          provider: 'google_workspace',
+          is_active: true
+        };
+
+        try {
+          await fetch('/api/mailboxes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(mbObj)
+          });
+        } catch (e) {}
+
+        added.push(mbObj);
+      }
+
+      if (added.length === 0) {
+        this.showToast('No valid emails detected in pasted text', 'error');
+        return;
+      }
+
+      // Merge and save locally
+      this.mailboxes = [...this.mailboxes.filter(m => !added.some(a => a.smtp_user === m.smtp_user)), ...added];
+      localStorage.setItem('fivenights_mailboxes', JSON.stringify(this.mailboxes));
+
+      this.bulkMailboxModalOpen = false;
+      this.showToast(`✅ Successfully connected and distributed ${added.length} Google Workspace accounts!`);
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
     editMailbox(mb) {

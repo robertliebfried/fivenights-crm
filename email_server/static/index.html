@@ -50,7 +50,7 @@
               <span x-text="settings.dry_run_mode ? 'Simulation' : 'Live'"></span>
             </span>
           </div>
-          <p class="text-[11px] text-slate-400 whitespace-nowrap leading-tight mt-0.5">Multi-Domain Outreach Hub</p>
+          <p class="text-[11px] text-slate-400 whitespace-nowrap leading-tight mt-0.5">Customer Retention &amp; VIP Management</p>
         </div>
       </div>
 
@@ -69,7 +69,7 @@
           <i data-lucide="shield-check" class="w-3.5 h-3.5 text-purple-400"></i> Agents (4)
         </button>
         <button @click="currentTab = 'leads'" :class="currentTab === 'leads' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap transition">
-          <i data-lucide="users" class="w-3.5 h-3.5"></i> Leads
+          <i data-lucide="user-round" class="w-3.5 h-3.5 text-sky-400"></i> Customers
         </button>
         <button @click="currentTab = 'campaigns'" :class="currentTab === 'campaigns' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap transition">
           <i data-lucide="mail" class="w-3.5 h-3.5"></i> Campaigns
@@ -201,14 +201,14 @@
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Clients in CRM</span>
+            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Customers in CRM</span>
             <span class="p-2 rounded-lg bg-blue-500/10 text-blue-400"><i data-lucide="users" class="w-4 h-4"></i></span>
           </div>
           <div class="mt-3 flex items-baseline gap-2">
             <span class="text-2xl font-bold text-white" x-text="stats.total_leads_in_db || 0"></span>
             <span class="text-xs text-emerald-400" x-text="(stats.leads_with_email || 0) + ' with email'"></span>
           </div>
-          <p class="mt-1 text-xs text-slate-500">Active & Inactive Client Base</p>
+          <p class="mt-1 text-xs text-slate-500">Active & Inactive Customer Base</p>
         </div>
 
         <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
@@ -252,15 +252,15 @@
       <div class="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 p-6 rounded-xl border border-blue-800/40 flex flex-col md:flex-row items-center justify-between gap-4">
         <div class="space-y-1">
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <i data-lucide="zap" class="w-5 h-5 text-amber-400"></i> Client Re-engagement & Outreach Hub
+            <i data-lucide="zap" class="w-5 h-5 text-amber-400"></i> Customer Retention & Win-Back Hub
           </h2>
           <p class="text-xs text-slate-300">
-            Re-engage inactive clients across your 5 domains and Google Workspace mailboxes using personalized sequences.
+            Re-engage inactive customers across your domains and Google Workspace mailboxes using personalized sequences.
           </p>
         </div>
         <div class="flex gap-3">
           <button @click="currentTab = 'reengagement'" class="btn btn-secondary text-xs">
-            <i data-lucide="user-check" class="w-4 h-4 text-amber-400"></i> Re-engage Clients
+            <i data-lucide="user-check" class="w-4 h-4 text-amber-400"></i> Re-engage Customers
           </button>
           <button @click="currentTab = 'campaigns'" class="btn btn-primary text-xs shadow-lg shadow-blue-500/20">
             <i data-lucide="plus-circle" class="w-4 h-4"></i> Create Campaign
@@ -278,27 +278,32 @@
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
           </button>
         </div>
-        <div class="divide-y divide-slate-800/60 max-h-72 overflow-y-auto">
-          <template x-for="log in logs.slice(0, 10)" :key="log.id">
-            <div class="px-5 py-3 text-xs flex items-center justify-between hover:bg-slate-800/30">
-              <div class="flex items-center gap-3">
-                <span class="badge" :class="log.status === 'SENT' ? 'badge-green' : log.status === 'DRY_RUN_SUCCESS' ? 'badge-amber' : 'badge-red'" x-text="log.status"></span>
-                <div>
-                  <span class="font-medium text-white" x-text="log.company_name || log.recipient_email"></span>
-                  <span class="text-slate-400 ml-2" x-text="'<' + log.recipient_email + '>'"></span>
+        <div class="divide-y divide-slate-800/60 max-h-96 overflow-y-auto">
+          <template x-for="log in logs" :key="log.id">
+            <div class="p-4 hover:bg-slate-800/20 transition flex items-start justify-between gap-4 text-xs">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-white" x-text="log.recipient"></span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase"
+                        :class="log.status === 'sent' ? 'bg-emerald-500/20 text-emerald-300' : log.status === 'dry_run' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'"
+                        x-text="log.status"></span>
                 </div>
+                <p class="text-slate-400" x-text="log.subject"></p>
+                <template x-if="log.error_message">
+                  <p class="text-[11px] text-red-400 font-mono" x-text="log.error_message"></p>
+                </template>
               </div>
-              <div class="text-slate-500 text-[11px]" x-text="log.created_at"></div>
+              <span class="text-[11px] text-slate-500 whitespace-nowrap" x-text="formatDate(log.sent_at)"></span>
             </div>
           </template>
-          <div x-show="logs.length === 0" class="p-6 text-center text-xs text-slate-500">
-            No email dispatches yet. Create a campaign or send a test email!
+          <div x-show="logs.length === 0" class="p-8 text-center text-slate-500 text-xs">
+            No activity logs found. Ready to dispatch campaigns!
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ================= TAB 2: LEADS EXPLORER ================= -->
+    <!-- ================= TAB 2: CUSTOMERS EXPLORER ================= -->
     <div x-show="currentTab === 'leads'" class="space-y-4">
       <!-- Search and Filter Bar -->
       <div class="bg-[#131d31] p-4 rounded-xl border border-slate-800 space-y-3">
@@ -306,13 +311,13 @@
           <!-- Text Search -->
           <div class="relative md:col-span-2">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-            <input type="text" x-model="leadsFilter.query" @input.debounce.300ms="loadLeads(1)" placeholder="Search company, email, regulator, city..." class="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            <input type="text" x-model="leadsFilter.query" @input.debounce.300ms="loadLeads(1)" placeholder="Search name, email, phone, country, city..." class="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
           </div>
 
           <!-- Country Filter -->
           <div>
             <select x-model="leadsFilter.country" @change="loadLeads(1)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
-              <option value="All">All Countries (29)</option>
+              <option value="All">All Countries</option>
               <option value="Ireland">Ireland</option>
               <option value="Australia">Australia</option>
               <option value="United Kingdom">United Kingdom</option>
@@ -336,15 +341,15 @@
             </select>
           </div>
 
-          <!-- Relevance Filter -->
+          <!-- Customer Status Filter -->
           <div>
             <select x-model="leadsFilter.relevance" @change="loadLeads(1)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
-              <option value="All">All Authorizations</option>
-              <option value="Legal representation / litigation possible">Legal / Litigation possible</option>
-              <option value="Claims handling / insurance claims authorization">Claims & Chargeback handling</option>
-              <option value="Crypto-asset services authorization">Crypto & VASP Services</option>
-              <option value="Forensic / investigative / asset-tracing service indicated">Forensic & Asset Tracing</option>
-              <option value="Financial or investment advice authorization">Financial & Investment Advice</option>
+              <option value="All">All Customer Types</option>
+              <option value="vip">VIP Customers</option>
+              <option value="active">Active Customers</option>
+              <option value="inactive">Inactive / Churned</option>
+              <option value="new">New Customers</option>
+              <option value="winback">Win-Back Targets</option>
             </select>
           </div>
         </div>
@@ -353,7 +358,7 @@
           <div class="flex items-center gap-4">
             <label class="flex items-center gap-2 cursor-pointer text-slate-300">
               <input type="checkbox" x-model="leadsFilter.only_with_email" @change="loadLeads(1)" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0">
-              <span>Only show leads with valid email</span>
+              <span>Only show customers with valid email</span>
             </label>
             <span class="text-slate-500">|</span>
             <span class="text-slate-400">Total matched: <strong class="text-white" x-text="leadsData.total"></strong></span>
@@ -362,9 +367,9 @@
 
           <div class="flex items-center gap-2">
             <button type="button" @click="openNewLeadModal()" class="btn btn-primary text-xs py-1 px-2.5 flex items-center gap-1.5 shadow-lg shadow-blue-500/20">
-              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Add Lead
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Add Customer
             </button>
-            <button type="button" @click="openCsvImportModal()" class="btn btn-secondary text-xs py-1 px-2.5 flex items-center gap-1.5 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10">
+            <button type="button" x-show="isAdmin()" @click="openCsvImportModal()" class="btn btn-secondary text-xs py-1 px-2.5 flex items-center gap-1.5 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10">
               <i data-lucide="upload-cloud" class="w-3.5 h-3.5 text-emerald-400"></i> Import CSV
             </button>
             <button @click="selectAllOnPage()" class="btn btn-secondary text-xs py-1 px-2.5">Select Page</button>
@@ -376,13 +381,13 @@
         </div>
       </div>
 
-      <!-- Manual Lead Creation Modal (Agents & Admin) -->
+      <!-- Manual Customer Creation Modal (Agents & Admin) -->
       <div x-show="newLeadModalOpen" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" style="display: none;">
         <div class="bg-[#131d31] border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
               <i data-lucide="user-plus" class="w-4 h-4 text-blue-400"></i>
-              Add New Lead / Client Manually
+              Add New Customer Manually
             </h3>
             <button @click="newLeadModalOpen = false" class="text-slate-400 hover:text-white">&times;</button>
           </div>
@@ -390,22 +395,22 @@
           <form @submit.prevent="submitNewLead()" class="space-y-3">
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs text-slate-300 mb-1 font-medium">Contact Person Name</label>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Customer Full Name</label>
                 <input type="text" x-model="newLeadForm.name" placeholder="e.g. Alex Miller" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
               </div>
               <div>
                 <label class="block text-xs text-slate-300 mb-1 font-medium">Email Address</label>
-                <input type="email" x-model="newLeadForm.email" placeholder="alex@client.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
+                <input type="email" x-model="newLeadForm.email" placeholder="alex@customer.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" required>
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs text-slate-300 mb-1 font-medium">Company / Organization</label>
-                <input type="text" x-model="newLeadForm.company" placeholder="e.g. Acme Corp" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Username / Account ID</label>
+                <input type="text" x-model="newLeadForm.company" placeholder="e.g. alex_vip99" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
               </div>
               <div>
-                <label class="block text-xs text-slate-300 mb-1 font-medium">Phone Number</label>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Phone / WhatsApp</label>
                 <input type="text" x-model="newLeadForm.phone" placeholder="+44 7911 123456" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
               </div>
             </div>
@@ -423,7 +428,7 @@
 
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs text-slate-300 mb-1 font-medium">Assign to Agent</label>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Assign to Account Manager (Agent)</label>
                 <select x-model="newLeadForm.assigned_agent_id" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
                   <option :value="null">-- Shared / Unassigned --</option>
                   <template x-for="ag in agents" :key="ag.id">
@@ -432,38 +437,39 @@
                 </select>
               </div>
               <div>
-                <label class="block text-xs text-slate-300 mb-1 font-medium">Priority</label>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Customer Tier</label>
                 <select x-model="newLeadForm.priority" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
-                  <option value="High">High Priority</option>
-                  <option value="Medium">Medium Priority</option>
-                  <option value="Low">Low Priority</option>
+                  <option value="VIP">VIP High-Roller</option>
+                  <option value="Gold">Gold Tier</option>
+                  <option value="Silver">Silver Tier</option>
+                  <option value="Standard">Standard Customer</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label class="block text-xs text-slate-300 mb-1 font-medium">Notes / Context</label>
-              <textarea x-model="newLeadForm.notes" rows="2" placeholder="e.g. Previous VIP client from fivenights.fun interested in win-back sequence..." class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500"></textarea>
+              <label class="block text-xs text-slate-300 mb-1 font-medium">Customer Notes / Activity Context</label>
+              <textarea x-model="newLeadForm.notes" rows="2" placeholder="e.g. VIP customer, prefers deposit bonuses, last active on FiveNights, assigned to Max..." class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
               <button type="button" @click="newLeadModalOpen = false" class="btn btn-secondary text-xs">Cancel</button>
               <button type="submit" class="btn btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-blue-500/20">
                 <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                Save Lead to CRM
+                Save Customer to CRM
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- CSV Import Modal (Admin & Team) -->
+      <!-- CSV Import Modal (Admin Tool) -->
       <div x-show="csvModalOpen" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" style="display: none;">
         <div class="bg-[#131d31] border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
               <i data-lucide="upload-cloud" class="w-4 h-4 text-emerald-400"></i>
-              Import Leads from CSV (Admin Tool)
+              Import Customers from CSV (Admin Tool)
             </h3>
             <button @click="csvModalOpen = false" class="text-slate-400 hover:text-white">&times;</button>
           </div>
@@ -486,8 +492,8 @@
           <div x-show="csvImportMode === 'file'" class="space-y-3">
             <label class="block border-2 border-dashed border-slate-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-slate-900/40">
               <i data-lucide="upload" class="w-8 h-8 text-emerald-400 mx-auto mb-2"></i>
-              <span class="block text-xs font-medium text-white">Click to select or drag & drop your CSV file</span>
-              <span class="block text-[11px] text-slate-400 mt-1">Supports standard CSV or Excel exports (.csv)</span>
+              <span class="block text-xs font-medium text-white">Click to select or drag & drop your customer CSV file</span>
+              <span class="block text-[11px] text-slate-400 mt-1">Supports standard customer exports (.csv)</span>
               <input type="file" accept=".csv, .txt" @change="handleCsvFileUpload($event)" class="hidden">
             </label>
           </div>
@@ -495,13 +501,13 @@
           <!-- Paste CSV Mode -->
           <div x-show="csvImportMode === 'paste'" class="space-y-2">
             <label class="block text-xs text-slate-300 font-medium">Paste CSV rows (comma or semicolon separated):</label>
-            <textarea x-model="csvText" @input="handleCsvTextInput()" rows="5" placeholder="email, name, company, phone, country&#10;client1@example.com, John Doe, Alpha Corp, +1234567, USA&#10;client2@fivenights.fun, Jane Smith, Beta SA, +41791234567, Switzerland" class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"></textarea>
+            <textarea x-model="csvText" @input="handleCsvTextInput()" rows="5" placeholder="email, name, username, phone, country&#10;player1@gmail.com, Alex Miller, alex_vip, +447911123456, United Kingdom&#10;user2@yahoo.com, Sophie Laurent, sophie99, +33612345678, France" class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"></textarea>
           </div>
 
           <!-- Assignment & Tagging Settings -->
           <div class="grid grid-cols-2 gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800">
             <div>
-              <label class="block text-xs text-slate-300 mb-1 font-medium">Assign Imported Leads to Agent</label>
+              <label class="block text-xs text-slate-300 mb-1 font-medium">Assign Imported Customers to Agent</label>
               <select x-model="csvAssignedAgent" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
                 <option :value="null">-- Unassigned / Any Agent --</option>
                 <template x-for="ag in agents" :key="ag.id">
@@ -511,7 +517,7 @@
             </div>
             <div>
               <label class="block text-xs text-slate-300 mb-1 font-medium">Batch Tag</label>
-              <input type="text" x-model="csvDefaultTag" placeholder="vip_clients, march_batch" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+              <input type="text" x-model="csvDefaultTag" placeholder="vip_customers, winback_march" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
             </div>
           </div>
 
@@ -566,13 +572,13 @@
             <thead class="bg-slate-900/80 text-slate-400 border-b border-slate-800">
               <tr>
                 <th class="p-3 w-10 text-center"><input type="checkbox" @change="toggleAllPage($event)" class="rounded bg-slate-900 border-slate-700"></th>
-                <th class="p-3">Company Name</th>
+                <th class="p-3">Customer Name</th>
                 <th class="p-3">Email Address</th>
+                <th class="p-3">Phone</th>
                 <th class="p-3">Country</th>
-                <th class="p-3">Regulatory Capability</th>
-                <th class="p-3">Regulator & Licence</th>
-                <th class="p-3">Website Signal</th>
-                <th class="p-3 text-center">MX Check</th>
+                <th class="p-3">Status / Tags</th>
+                <th class="p-3">Assigned Agent</th>
+                <th class="p-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
@@ -582,44 +588,52 @@
                     <input type="checkbox" :value="lead" x-model="selectedLeads" class="rounded bg-slate-900 border-slate-700 text-blue-600">
                   </td>
                   <td class="p-3 font-semibold text-white">
-                    <div x-text="lead.company_name"></div>
-                    <div class="text-[10px] text-slate-500" x-text="lead.organization_type"></div>
+                    <div x-text="lead.contact_person || lead.company_name"></div>
+                    <div class="text-[10px] text-slate-500" x-text="lead.city ? lead.city : ''"></div>
                   </td>
                   <td class="p-3">
                     <template x-if="lead.email">
                       <span class="text-blue-300 font-mono" x-text="lead.email"></span>
                     </template>
                     <template x-if="!lead.email">
-                      <span class="text-slate-600 italic">No email listed in source</span>
+                      <span class="text-slate-600 italic">No email on file</span>
                     </template>
                   </td>
-                  <td class="p-3" x-text="lead.country"></td>
+                  <td class="p-3 text-slate-300 font-mono text-[11px]" x-text="lead.phone || '—'"></td>
+                  <td class="p-3 text-slate-300" x-text="lead.country || '—'"></td>
                   <td class="p-3">
-                    <span class="badge" :class="lead.relevance.includes('Legal') ? 'badge-blue' : lead.relevance.includes('Claims') ? 'badge-green' : lead.relevance.includes('Crypto') ? 'badge-amber' : 'badge-gray'" x-text="lead.relevance"></span>
-                  </td>
-                  <td class="p-3 text-slate-400">
-                    <div class="font-mono text-[11px]" x-text="lead.licence_number"></div>
-                    <div class="text-[10px] text-slate-500" x-text="lead.regulator"></div>
-                  </td>
-                  <td class="p-3">
-                    <span class="badge badge-amber text-[10px]" x-text="lead.website_status"></span>
-                  </td>
-                  <td class="p-3 text-center">
-                    <template x-if="lead.email">
-                      <button @click="verifyLeadEmail(lead)" class="text-slate-400 hover:text-blue-400" title="Check MX Records (Hunter style)">
-                        <i data-lucide="shield-check" class="w-4 h-4"></i>
-                      </button>
+                    <template x-if="lead.tags">
+                      <div class="flex flex-wrap gap-1">
+                        <template x-for="tag in (lead.tags || '').split(',').filter(t => t.trim())" :key="tag">
+                          <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                                :class="tag.trim().toLowerCase().includes('vip') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : tag.trim().toLowerCase().includes('inactive') || tag.trim().toLowerCase().includes('churn') ? 'bg-slate-700/60 text-slate-400' : 'bg-blue-500/15 text-blue-300 border border-blue-500/20'"
+                                x-text="tag.trim()"></span>
+                        </template>
+                      </div>
                     </template>
-                    <template x-if="!lead.email">
-                      <span class="text-slate-700">-</span>
+                    <template x-if="!lead.tags">
+                      <span class="text-slate-600 italic text-[10px]">—</span>
+                    </template>
+                  </td>
+                  <td class="p-3">
+                    <template x-if="lead.assigned_agent_name">
+                      <div class="flex items-center gap-1.5">
+                        <div class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                             :style="'background-color: ' + (agents.find(a => a.name === lead.assigned_agent_name)?.avatar_color || '#6366f1')"
+                             x-text="(lead.assigned_agent_name || '?').charAt(0)"></div>
+                        <span class="text-slate-300" x-text="lead.assigned_agent_name"></span>
+                      </div>
+                    </template>
+                    <template x-if="!lead.assigned_agent_name">
+                      <span class="text-slate-600 text-[10px]">Unassigned</span>
                     </template>
                   </td>
                   <td class="p-3 text-center whitespace-nowrap">
-                    <button type="button" @click="openEditLeadModal(lead)" 
+                    <button type="button" @click="openEditLeadModal(lead)"
                             class="px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1.5 transition"
                             :class="isAdmin() ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/40' : 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/40'">
                       <i :data-lucide="isAdmin() ? 'edit-3' : 'message-square'" class="w-3 h-3"></i>
-                      <span x-text="isAdmin() ? 'Edit Lead' : 'Notes / Comments'"></span>
+                      <span x-text="isAdmin() ? 'Edit Customer' : 'Notes / Comments'"></span>
                     </button>
                   </td>
                 </tr>
@@ -647,9 +661,9 @@
             <div>
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i :data-lucide="isAdmin() ? 'edit-3' : 'message-square'" class="w-4 h-4 text-indigo-400"></i>
-                <span x-text="isAdmin() ? 'Edit Lead Details (Admin Access)' : 'Client File & Comments (Agent View)'"></span>
+                <span x-text="isAdmin() ? 'Edit Customer Profile (Admin Access)' : 'Customer Profile & Notes (Agent View)'"></span>
               </h3>
-              <p class="text-[11px] text-slate-400 mt-0.5" x-text="isAdmin() ? 'Full permissions to modify contact data or delete lead.' : 'Agents can view details and edit only comments they added.'"></p>
+              <p class="text-[11px] text-slate-400 mt-0.5" x-text="isAdmin() ? 'Full permissions to modify customer data or remove customer profile.' : 'Agents can view details and edit only comments they added.'"></p>
             </div>
             <button @click="editingLeadModalOpen = false" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
           </div>
@@ -657,16 +671,16 @@
           <!-- Client Overview Header Card -->
           <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs grid grid-cols-2 gap-2">
             <div>
-              <span class="text-slate-500 block text-[10px]">Contact Person</span>
-              <span class="font-bold text-white" x-text="editingLead?.contact_person || editingLead?.company_name || 'Client'"></span>
+              <span class="text-slate-500 block text-[10px]">Customer Full Name</span>
+              <span class="font-bold text-white" x-text="editingLead?.contact_person || editingLead?.company_name || 'Customer'"></span>
             </div>
             <div>
               <span class="text-slate-500 block text-[10px]">Email Address</span>
               <span class="font-mono text-blue-300 font-medium" x-text="editingLead?.email"></span>
             </div>
             <div>
-              <span class="text-slate-500 block text-[10px]">Company / Project</span>
-              <span class="text-slate-200" x-text="editingLead?.company_name || '-'"></span>
+              <span class="text-slate-500 block text-[10px]">Username / Account ID</span>
+              <span class="text-slate-200 font-mono" x-text="editingLead?.company_name || '-'"></span>
             </div>
             <div>
               <span class="text-slate-500 block text-[10px]">Location</span>
@@ -680,7 +694,7 @@
               <span class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Admin Data Controls:</span>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-xs text-slate-400 mb-1">Contact Name</label>
+                  <label class="block text-xs text-slate-400 mb-1">Customer Name</label>
                   <input type="text" x-model="editingLead.contact_person" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
                 </div>
                 <div>
@@ -690,11 +704,11 @@
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-xs text-slate-400 mb-1">Company</label>
+                  <label class="block text-xs text-slate-400 mb-1">Username / Account ID</label>
                   <input type="text" x-model="editingLead.company_name" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
                 </div>
                 <div>
-                  <label class="block text-xs text-slate-400 mb-1">Phone</label>
+                  <label class="block text-xs text-slate-400 mb-1">Phone / WhatsApp</label>
                   <input type="text" x-model="editingLead.phone" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
                 </div>
               </div>
@@ -715,10 +729,10 @@
               </div>
               <div class="flex items-center justify-between pt-2">
                 <button type="button" @click="deleteCurrentLead(editingLead.id)" class="px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 text-xs font-semibold flex items-center gap-1.5 transition">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete Lead
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete Customer
                 </button>
                 <button type="button" @click="saveLeadChanges()" class="btn btn-primary text-xs py-1.5 px-3">
-                  <i data-lucide="check" class="w-3.5 h-3.5"></i> Save Client Info
+                  <i data-lucide="check" class="w-3.5 h-3.5"></i> Save Customer Info
                 </button>
               </div>
             </div>
@@ -946,8 +960,11 @@
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <button type="button" @click="openBulkMailboxModal()" class="btn btn-secondary text-xs flex items-center gap-1.5 border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> Bulk Connect (Paste List)
+          </button>
           <button type="button" @click="createNewMailbox()" class="btn btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
-            <i data-lucide="plus" class="w-4 h-4"></i> Connect Google Workspace Account
+            <i data-lucide="plus" class="w-4 h-4"></i> Connect Single Account
           </button>
           <button type="button" @click="loadMailboxes()" class="btn btn-secondary text-xs">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
@@ -1153,6 +1170,48 @@
               </div>
             </form>
           </template>
+        </div>
+      </div>
+
+      <!-- Quick Bulk Connect Google Workspace Accounts Modal -->
+      <div x-show="bulkMailboxModalOpen" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-[#131d31] border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+              Bulk Connect Google Workspace Accounts
+            </h3>
+            <button @click="bulkMailboxModalOpen = false" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+          </div>
+
+          <div class="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-xs space-y-1.5 text-slate-300">
+            <p class="text-indigo-300 font-semibold flex items-center gap-1.5">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-indigo-400"></i> Paste all your accounts in 1 step:
+            </p>
+            <p class="text-[11px] text-slate-400">
+              Format: <code class="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300">email : 16_character_app_password : agent_name (optional)</code>
+            </p>
+            <p class="text-[11px] text-slate-400">
+              Accounts will automatically be configured with Google SMTP (<code class="text-emerald-300">smtp.gmail.com:587</code> + TLS) and evenly distributed among your 4 team agents!
+            </p>
+          </div>
+
+          <form @submit.prevent="importBulkMailboxes()" class="space-y-3">
+            <div>
+              <label class="block text-xs text-slate-300 font-medium mb-1">Paste account list (1 per line):</label>
+              <textarea x-model="bulkMailboxText" rows="7" 
+                        placeholder="outreach1@fivenights.fun : abcd efgh ijkl mnop : Max&#10;outreach2@fivenights.fun : qwer tyui opas dfgh : Fred&#10;outreach3@fivenights.fun : zxcv bnmq wert yuiop : Chriss&#10;admin@fivenights.fun : asdf ghjk lzxc vbnm : John" 
+                        class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-500" required></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button type="button" @click="bulkMailboxModalOpen = false" class="btn btn-secondary text-xs">Cancel</button>
+              <button type="submit" class="btn btn-primary text-xs flex items-center gap-1.5 shadow-lg shadow-blue-500/20">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                Connect All Accounts Now
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
