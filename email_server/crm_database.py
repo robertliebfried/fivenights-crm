@@ -142,12 +142,12 @@ async def init_crm_db():
             );
         """)
 
-        # 7. Multi-Mailbox Accounts
+        # 7. Multi-Mailbox Accounts (Google Workspace & Custom SMTP)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS mailboxes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
-                smtp_host TEXT NOT NULL,
+                smtp_host TEXT NOT NULL DEFAULT 'smtp.gmail.com',
                 smtp_port INTEGER NOT NULL DEFAULT 587,
                 smtp_user TEXT DEFAULT '',
                 smtp_password TEXT DEFAULT '',
@@ -155,12 +155,24 @@ async def init_crm_db():
                 smtp_use_ssl BOOLEAN DEFAULT 0,
                 sender_name TEXT NOT NULL,
                 sender_email TEXT NOT NULL,
-                daily_limit INTEGER DEFAULT 50,
+                daily_limit INTEGER DEFAULT 100,
                 sent_today INTEGER DEFAULT 0,
+                assigned_agent_id INTEGER DEFAULT NULL,
+                provider TEXT DEFAULT 'google_workspace',
                 is_active BOOLEAN DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+
+        # Migrations for existing mailboxes table
+        try:
+            await db.execute("ALTER TABLE mailboxes ADD COLUMN assigned_agent_id INTEGER DEFAULT NULL")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE mailboxes ADD COLUMN provider TEXT DEFAULT 'google_workspace'")
+        except Exception:
+            pass
 
         # Seed 5 Mailbox slots if less than 5 exist
         async with db.execute("SELECT COUNT(*) FROM mailboxes") as c:
@@ -425,31 +437,45 @@ async def enroll_contacts_in_sequence(sequence_id: int, contact_ids: list):
                         ) VALUES (?, ?, 1, 'paused', CURRENT_TIMESTAMP)
                     """, (sequence_id, cid))
                     enrolled += 1
-        await db.commit()
+            await db.commit()
         return enrolled
 
 # ==========================================
 # 5-Domain Multi-Mailbox CRUD Operations
 # ==========================================
-async def get_all_mailboxes():
-    """Retrieve all 5 domain mailboxes with usage stats"""
+async def get_all_mailboxes(agent_id: int = None):
+    """Retrieve mailboxes with agent assignment and usage stats"""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("""
-            SELECT id, name, smtp_host, smtp_port, smtp_user, 
-                   CASE WHEN smtp_password IS NOT NULL AND smtp_password != '' THEN 1 ELSE 0 END as has_password,
-                   smtp_use_tls, smtp_use_ssl, sender_name, sender_email,
-                   daily_limit, sent_today, is_active, created_at
-            FROM mailboxes
-            ORDER BY id ASC
-        """) as cursor:
+        sql = """
+            SELECT m.id, m.name, m.smtp_host, m.smtp_port, m.smtp_user, 
+                   CASE WHEN m.smtp_password IS NOT NULL AND m.smtp_password != '' THEN 1 ELSE 0 END as has_password,
+                   m.smtp_use_tls, m.smtp_use_ssl, m.sender_name, m.sender_email,
+                   m.daily_limit, m.sent_today, m.assigned_agent_id, m.provider,
+                   m.is_active, m.created_at,
+                   a.name as assigned_agent_name, a.role as assigned_agent_role, a.avatar_color as assigned_agent_color
+            FROM mailboxes m
+            LEFT JOIN agents a ON m.assigned_agent_id = a.id
+        """
+        params = []
+        if agent_id:
+            sql += " WHERE m.assigned_agent_id = ? OR m.assigned_agent_id IS NULL"
+            params.append(agent_id)
+        sql += " ORDER BY m.id ASC"
+
+        async with db.execute(sql, params) as cursor:
             return [dict(r) for r in await cursor.fetchall()]
 
 async def get_mailbox_by_id(mailbox_id: int, include_password: bool = False):
     """Retrieve a specific mailbox by ID"""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM mailboxes WHERE id = ?", (mailbox_id,)) as cursor:
+        async with db.execute("""
+            SELECT m.*, a.name as assigned_agent_name 
+            FROM mailboxes m 
+            LEFT JOIN agents a ON m.assigned_agent_id = a.id 
+            WHERE m.id = ?
+        """, (mailbox_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -460,7 +486,7 @@ async def get_mailbox_by_id(mailbox_id: int, include_password: bool = False):
             return res
 
 async def save_mailbox(data: dict):
-    """Create or update a mailbox configuration for a domain"""
+    """Create or update a mailbox configuration for Google Workspace or custom SMTP"""
     mailbox_id = data.get("id")
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -476,13 +502,24 @@ async def save_mailbox(data: dict):
         if not password and existing and existing["smtp_password"]:
             password = existing["smtp_password"]
 
+        raw_agent = data.get("assigned_agent_id")
+        if raw_agent in ("", "none", 0, "0", None):
+            assigned_agent_id = None
+        else:
+            try:
+                assigned_agent_id = int(raw_agent)
+            except (ValueError, TypeError):
+                assigned_agent_id = None
+
+        provider = data.get("provider", "google_workspace")
+
         if existing:
             await db.execute("""
                 UPDATE mailboxes SET
                     name = ?, smtp_host = ?, smtp_port = ?, smtp_user = ?,
                     smtp_password = ?, smtp_use_tls = ?, smtp_use_ssl = ?,
                     sender_name = ?, sender_email = ?, daily_limit = ?,
-                    is_active = ?
+                    assigned_agent_id = ?, provider = ?, is_active = ?
                 WHERE id = ?
             """, (
                 data.get("name", existing["name"]),
@@ -494,7 +531,9 @@ async def save_mailbox(data: dict):
                 1 if data.get("smtp_use_ssl", False) else 0,
                 data.get("sender_name", existing["sender_name"]),
                 data.get("sender_email", existing["sender_email"]),
-                int(data.get("daily_limit", 50)),
+                int(data.get("daily_limit", 100)),
+                assigned_agent_id,
+                provider,
                 1 if data.get("is_active", True) else 0,
                 mailbox_id
             ))
@@ -505,19 +544,21 @@ async def save_mailbox(data: dict):
                 INSERT INTO mailboxes (
                     name, smtp_host, smtp_port, smtp_user, smtp_password,
                     smtp_use_tls, smtp_use_ssl, sender_name, sender_email,
-                    daily_limit, sent_today, is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                    daily_limit, sent_today, assigned_agent_id, provider, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
             """, (
-                data.get("name", "New Domain"),
-                data.get("smtp_host", "smtp.yourdomain.com"),
+                data.get("name", "Google Workspace Account"),
+                data.get("smtp_host", "smtp.gmail.com"),
                 int(data.get("smtp_port", 587)),
                 data.get("smtp_user", ""),
                 password,
                 1 if data.get("smtp_use_tls", True) else 0,
                 1 if data.get("smtp_use_ssl", False) else 0,
-                data.get("sender_name", "FiveNights Support"),
+                data.get("sender_name", ""),
                 data.get("sender_email", ""),
-                int(data.get("daily_limit", 50)),
+                int(data.get("daily_limit", 100)),
+                assigned_agent_id,
+                provider,
                 1 if data.get("is_active", True) else 0
             ))
             await db.commit()

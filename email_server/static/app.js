@@ -1,7 +1,13 @@
 function app() {
   return {
     currentTab: 'overview',
-    stats: {},
+    stats: {
+      total_leads_in_db: 0,
+      leads_with_email: 0,
+      total_sent_real: 0,
+      total_dry_run: 0,
+      total_campaigns: 0
+    },
     leadsData: { items: [], total: 0, page: 1, total_pages: 1 },
     leadsFilter: {
       query: '',
@@ -461,8 +467,40 @@ function app() {
       }
     },
 
+    createNewMailbox() {
+      this.editingMailbox = {
+        id: null,
+        name: 'Google Workspace Account #' + (this.mailboxes.length + 1),
+        smtp_host: 'smtp.gmail.com',
+        smtp_port: 587,
+        smtp_user: '',
+        smtp_password: '',
+        smtp_use_tls: true,
+        smtp_use_ssl: false,
+        sender_name: this.activeAgent ? this.activeAgent.name : 'FiveNights Support',
+        sender_email: this.activeAgent ? this.activeAgent.email : 'support@fivenights.fun',
+        daily_limit: 100,
+        assigned_agent_id: this.activeAgent && this.activeAgent.name !== 'John' ? this.activeAgent.id : null,
+        provider: 'google_workspace',
+        is_active: true
+      };
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+    },
+
+    setGoogleWorkspacePreset() {
+      if (!this.editingMailbox) return;
+      this.editingMailbox.smtp_host = 'smtp.gmail.com';
+      this.editingMailbox.smtp_port = 587;
+      this.editingMailbox.smtp_use_tls = true;
+      this.editingMailbox.smtp_use_ssl = false;
+      this.editingMailbox.provider = 'google_workspace';
+      if (!this.editingMailbox.daily_limit) this.editingMailbox.daily_limit = 100;
+      this.showToast('Applied Google Workspace SMTP defaults (smtp.gmail.com:587)');
+    },
+
     editMailbox(mb) {
       this.editingMailbox = JSON.parse(JSON.stringify(mb));
+      this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
     },
 
     async saveCurrentMailbox() {
