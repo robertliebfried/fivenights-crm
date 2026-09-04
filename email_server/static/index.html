@@ -221,6 +221,12 @@
             <span><strong class="text-sky-300">Max, Fred, Chriss (Agents):</strong> Customer management, claim leads, 1-click B2C pitches, unified inbox.</span>
           </li>
         </ul>
+        <div class="pt-2 border-t border-slate-800 text-center">
+          <button type="button" @click="openGuide('quickstart')" class="text-xs text-amber-400 hover:text-amber-300 font-semibold inline-flex items-center gap-1.5 transition">
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+            <span>Read CRM User Guide &amp; Handbook &rarr;</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -2347,8 +2353,10 @@
         </div>
       </div>
     </div>
+  </div>
+
   <!-- ================= INTERACTIVE CRM USER GUIDE & HANDBOOK MODAL ================= -->
-  <div x-show="guideModalOpen" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style="display: none;">
+  <div x-show="guideModalOpen" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" style="display: none;" @click.self="guideModalOpen = false" @keydown.escape.window="guideModalOpen = false">
     <div class="bg-[#131d31] border border-slate-700/80 rounded-2xl max-w-4xl w-full p-6 space-y-5 shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
       
       <!-- Modal Header -->
