@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Overview — FiveNights.fun CRM</title>
+  <title>Settings — FiveNights.fun CRM</title>
   <!-- Tailwind CSS, Alpine.js & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="app.js"></script>
@@ -32,7 +32,7 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="bg-[#0b1120] text-slate-100 min-h-screen flex flex-col antialiased" x-data="app('overview')" x-init="initApp()">
+<body class="bg-[#0b1120] text-slate-100 min-h-screen flex flex-col antialiased" x-data="app('settings')" x-init="initApp()">
 
   <!-- Top Navigation Header (Full width, zero horizontal scrolling) -->
   <header class="bg-[#131d31] border-b border-slate-800 sticky top-0 z-50 shadow-sm">
@@ -249,254 +249,155 @@
   <!-- Main Content Body -->
   <main x-show="isAuthenticated" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-    <!-- ================= TAB 1: OVERVIEW ================= -->
-    <div x-show="currentTab === 'overview'" class="space-y-6">
-
-      <!-- Admin Command Bar (John only) -->
-      <div x-show="isAdmin()" class="bg-gradient-to-r from-rose-900/30 via-slate-900 to-slate-900 p-4 rounded-xl border border-rose-800/30 space-y-3">
-        <div class="flex items-center gap-2 mb-1">
-          <i data-lucide="terminal" class="w-4 h-4 text-rose-400"></i>
-          <span class="text-xs font-bold text-rose-300 uppercase tracking-wider">Admin Command Center</span>
-          <span class="text-[10px] text-slate-500 ml-auto">Visible only to John (Admin)</span>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button @click="currentTab='leads'; openCsvImportModal()" class="flex flex-col items-center gap-2 p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition group">
-            <i data-lucide="upload-cloud" class="w-5 h-5 text-emerald-400 group-hover:scale-110 transition"></i>
-            <span class="text-xs font-semibold text-white">Import CSV</span>
-            <span class="text-[10px] text-slate-500 text-center">Add customers in bulk</span>
-          </button>
-          <button @click="distributeLeads()" class="flex flex-col items-center gap-2 p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-blue-500/50 hover:bg-blue-500/5 transition group">
-            <i data-lucide="users" class="w-5 h-5 text-blue-400 group-hover:scale-110 transition"></i>
-            <span class="text-xs font-semibold text-white">Distribute Leads</span>
-            <span class="text-[10px] text-slate-500 text-center">Evenly split unassigned</span>
-          </button>
-          <button @click="autoAssignMailboxes()" class="flex flex-col items-center gap-2 p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-500/50 hover:bg-amber-500/5 transition group">
-            <i data-lucide="mail-plus" class="w-5 h-5 text-amber-400 group-hover:scale-110 transition"></i>
-            <span class="text-xs font-semibold text-white">Auto-Assign Mailboxes</span>
-            <span class="text-[10px] text-slate-500 text-center">Divide 20 GWorkspace accounts</span>
-          </button>
-          <button @click="loadTeamStats()" class="flex flex-col items-center gap-2 p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-purple-500/50 hover:bg-purple-500/5 transition group">
-            <i data-lucide="bar-chart-2" class="w-5 h-5 text-purple-400 group-hover:scale-110 transition"></i>
-            <span class="text-xs font-semibold text-white">Team Pulse</span>
-            <span class="text-[10px] text-slate-500 text-center">Refresh agent stats</span>
-          </button>
-        </div>
-        <!-- Team Pulse Stats (loaded on demand) -->
-        <template x-if="teamStats && teamStats.length > 0">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-            <template x-for="ag in teamStats" :key="ag.agent_id">
-              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-xs space-y-1.5">
-                <div class="flex items-center gap-2">
-                  <div class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                       :style="'background-color: ' + (agents.find(a => a.name === ag.agent_name)?.avatar_color || '#6366f1')"
-                       x-text="(ag.agent_name || '?').charAt(0)"></div>
-                  <span class="font-bold text-white" x-text="ag.agent_name"></span>
-                </div>
-                <div class="grid grid-cols-2 gap-1 text-[11px]">
-                  <div><span class="text-slate-500">Customers:</span> <span class="text-white font-semibold" x-text="ag.contact_count"></span></div>
-                  <div><span class="text-slate-500">Mailboxes:</span> <span class="text-white font-semibold" x-text="ag.mailbox_count"></span></div>
-                  <div><span class="text-slate-500">Unread:</span> <span class="text-rose-400 font-semibold" x-text="ag.unread_threads"></span></div>
-                  <div><span class="text-slate-500">Sent today:</span> <span class="text-emerald-400 font-semibold" x-text="ag.sent_today"></span></div>
-                </div>
-              </div>
-            </template>
-          </div>
-        </template>
-      </div>
-
-      <!-- Agent Daily Workflow Guide (Visible to Max, Fred, Chriss) -->
-      <div x-show="!isAdmin()" class="bg-gradient-to-r from-sky-900/30 via-slate-900 to-slate-900 p-4 rounded-xl border border-sky-800/40 space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <i data-lucide="compass" class="w-4 h-4 text-sky-400"></i>
-            <span class="text-xs font-bold text-sky-300 uppercase tracking-wider">Agent Daily Playbook — 3 Quick Steps</span>
-          </div>
-          <span class="text-[10px] text-slate-400">Signed in as <strong class="text-white" x-text="activeAgent?.name || 'Agent'"></strong></span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          <div @click="currentTab = 'leads'; leadsFilter.relevance = 'unassigned'; loadLeads(1);" class="p-3 bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 rounded-xl cursor-pointer transition group">
-            <div class="flex items-center gap-2 text-sky-300 font-bold mb-1">
-              <span class="w-5 h-5 rounded-full bg-sky-500/20 flex items-center justify-center text-[11px]">1</span>
-              <span>Claim New Leads</span>
-            </div>
-            <p class="text-[11px] text-slate-400">Go to Customers &rarr; filter <strong class="text-slate-200">Unassigned Pool</strong>. Click <strong class="text-sky-300">+ Claim</strong> to add players to your portfolio.</p>
-          </div>
-          <div @click="currentTab = 'inbox'; loadInboxThreads();" class="p-3 bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 rounded-xl cursor-pointer transition group">
-            <div class="flex items-center gap-2 text-emerald-300 font-bold mb-1">
-              <span class="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[11px]">2</span>
-              <span>Check Unified Inbox</span>
-            </div>
-            <p class="text-[11px] text-slate-400">Read inbound customer inquiries. Use 1-click reply chips to respond in under 15 seconds.</p>
-          </div>
-          <div @click="currentTab = 'leads'; leadsFilter.relevance = 'mine'; loadLeads(1);" class="p-3 bg-slate-900/80 border border-slate-800 hover:border-amber-500/50 rounded-xl cursor-pointer transition group">
-            <div class="flex items-center gap-2 text-amber-300 font-bold mb-1">
-              <span class="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[11px]">3</span>
-              <span>Nurture Your Portfolio</span>
-            </div>
-            <p class="text-[11px] text-slate-400">Click <strong class="text-amber-300">⚡ Send</strong> to trigger tailored VIP reload, win-back, or check-in emails.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4-Step Interactive Operational Stepper (Always Available) -->
-      <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 space-y-4">
-        <div class="flex items-center justify-between">
+    <!-- ================= TAB 4: SMTP SETTINGS ================= -->
+    <div x-show="currentTab === 'settings'" class="max-w-3xl mx-auto space-y-6">
+      <div class="bg-[#131d31] p-6 rounded-xl border border-slate-800 space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
           <div>
-            <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <i data-lucide="map" class="w-4 h-4 text-indigo-400"></i>
-              How FiveNights CRM Operates — 4-Step Operational Flow
-            </h3>
-            <p class="text-[11px] text-slate-400 mt-0.5">Follow this simple sequence to maximize deliverability, engage VIP players, and manage replies.</p>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="server" class="w-5 h-5 text-blue-400"></i> SMTP Server & Anti-Spam Dispatch Settings
+            </h2>
+            <p class="text-xs text-slate-400">Configure your mail transport provider, sender credentials, and rate limits.</p>
           </div>
-          <button type="button" @click="openGuide('quickstart')" class="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1">
-            <span>Open Interactive Handbook</span> &rarr;
-          </button>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <!-- Step 1 -->
-          <div @click="currentTab = 'domains'" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 rounded-xl cursor-pointer transition group">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">Step 1</span>
-              <i data-lucide="mail-plus" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition"></i>
-            </div>
-            <h4 class="text-xs font-bold text-white group-hover:text-emerald-300">Mailbox Infrastructure</h4>
-            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">20 Google Workspace accounts split evenly across agents (100/day limit per account) for 99%+ inbox placement.</p>
-          </div>
-
-          <!-- Step 2 -->
-          <div @click="currentTab = 'leads'" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 rounded-xl cursor-pointer transition group">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[10px] uppercase font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">Step 2</span>
-              <i data-lucide="user-round" class="w-4 h-4 text-blue-400 group-hover:scale-110 transition"></i>
-            </div>
-            <h4 class="text-xs font-bold text-white group-hover:text-blue-300">Customers &amp; Lead Pools</h4>
-            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Admin imports CSVs into the unassigned pool. Agents claim leads directly or Admin distributes them evenly.</p>
-          </div>
-
-          <!-- Step 3 -->
-          <div @click="currentTab = 'campaigns'" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-purple-500/50 rounded-xl cursor-pointer transition group">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[10px] uppercase font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">Step 3</span>
-              <i data-lucide="send" class="w-4 h-4 text-purple-400 group-hover:scale-110 transition"></i>
-            </div>
-            <h4 class="text-xs font-bold text-white group-hover:text-purple-300">1-Click Outreach</h4>
-            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Click ⚡ Send for instant 1-click B2C pitch emails (VIP Concierge, Win-Back, Tier Upgrade, Check-In).</p>
-          </div>
-
-          <!-- Step 4 -->
-          <div @click="currentTab = 'inbox'; loadInboxThreads();" class="p-3.5 bg-slate-900/70 border border-slate-800 hover:border-sky-500/50 rounded-xl cursor-pointer transition group">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[10px] uppercase font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full">Step 4</span>
-              <i data-lucide="inbox" class="w-4 h-4 text-sky-400 group-hover:scale-110 transition"></i>
-            </div>
-            <h4 class="text-xs font-bold text-white group-hover:text-sky-300">Unified Inbox &amp; Replies</h4>
-            <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Incoming customer inquiries land in real-time. Reply using preset chips via your dedicated Google Workspace account.</p>
+          <!-- Quick Preset Buttons -->
+          <div class="flex gap-1.5">
+            <button type="button" @click="applySmtpPreset('gmail')" class="tag-btn">Gmail</button>
+            <button type="button" @click="applySmtpPreset('outlook')" class="tag-btn">Outlook 365</button>
+            <button type="button" @click="applySmtpPreset('sendgrid')" class="tag-btn">SendGrid</button>
+            <button type="button" @click="applySmtpPreset('ses')" class="tag-btn">Amazon SES</button>
           </div>
         </div>
-      </div>
 
-      <!-- Stats Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
+        <!-- Settings & Deliverability Best Practices Banner -->
+        <div class="p-4 bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-xl text-xs space-y-2.5">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Customers in CRM</span>
-            <span class="p-2 rounded-lg bg-blue-500/10 text-blue-400"><i data-lucide="users" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3 flex items-baseline gap-2">
-            <span class="text-2xl font-bold text-white" x-text="stats.total_leads_in_db || 0"></span>
-            <span class="text-xs text-emerald-400" x-text="(stats.leads_with_email || 0) + ' with email'"></span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">Active & Inactive Customer Base</p>
-        </div>
-
-        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Dispatched (Real)</span>
-            <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400"><i data-lucide="check-circle-2" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3 flex items-baseline gap-2">
-            <span class="text-2xl font-bold text-white" x-text="stats.total_sent_real || 0"></span>
-            <span class="text-xs text-slate-400">Live emails sent</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">Delivered via Google Workspace SMTP</p>
-        </div>
-
-        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Dry-Run Simulations</span>
-            <span class="p-2 rounded-lg bg-amber-500/10 text-amber-400"><i data-lucide="flask-conical" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3 flex items-baseline gap-2">
-            <span class="text-2xl font-bold text-white" x-text="stats.total_dry_run || 0"></span>
-            <span class="text-xs text-amber-400">Verified sequences</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">Tested without dispatching real emails</p>
-        </div>
-
-        <div class="bg-[#131d31] p-5 rounded-xl border border-slate-800 shadow-sm">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Campaigns</span>
-            <span class="p-2 rounded-lg bg-purple-500/10 text-purple-400"><i data-lucide="play" class="w-4 h-4"></i></span>
-          </div>
-          <div class="mt-3 flex items-baseline gap-2">
-            <span class="text-2xl font-bold text-white" x-text="stats.total_campaigns || 0"></span>
-            <span class="text-xs text-purple-400">Created in system</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">With rate limiting & anti-spam</p>
-        </div>
-      </div>
-
-      <!-- Quick Action Banner -->
-      <div class="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 p-6 rounded-xl border border-blue-800/40 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="space-y-1">
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <i data-lucide="zap" class="w-5 h-5 text-amber-400"></i> Customer Retention & Win-Back Hub
-          </h2>
-          <p class="text-xs text-slate-300">
-            Re-engage inactive customers across your domains and Google Workspace mailboxes using personalized sequences.
-          </p>
-        </div>
-        <div class="flex gap-3">
-          <button @click="currentTab = 'reengagement'" class="btn btn-secondary text-xs">
-            <i data-lucide="user-check" class="w-4 h-4 text-amber-400"></i> Re-engage Customers
-          </button>
-          <button @click="currentTab = 'campaigns'" class="btn btn-primary text-xs shadow-lg shadow-blue-500/20">
-            <i data-lucide="plus-circle" class="w-4 h-4"></i> Create Campaign
-          </button>
-        </div>
-      </div>
-
-      <!-- Recent Activity Feed -->
-      <div class="bg-[#131d31] rounded-xl border border-slate-800 overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
-            <i data-lucide="activity" class="w-4 h-4 text-blue-400"></i> Live Activity Feed
-          </h3>
-          <button @click="loadLogs()" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
-          </button>
-        </div>
-        <div class="divide-y divide-slate-800/60 max-h-96 overflow-y-auto">
-          <template x-for="log in logs" :key="log.id">
-            <div class="p-4 hover:bg-slate-800/20 transition flex items-start justify-between gap-4 text-xs">
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-white" x-text="log.recipient"></span>
-                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase"
-                        :class="log.status === 'sent' ? 'bg-emerald-500/20 text-emerald-300' : log.status === 'dry_run' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'"
-                        x-text="log.status"></span>
-                </div>
-                <p class="text-slate-400" x-text="log.subject"></p>
-                <template x-if="log.error_message">
-                  <p class="text-[11px] text-red-400 font-mono" x-text="log.error_message"></p>
-                </template>
+            <div class="flex items-center gap-2">
+              <span class="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </span>
+              <div>
+                <span class="font-bold text-white block">Safe Dispatch &amp; Anti-Spam Delivery Rules:</span>
+                <span class="text-[11px] text-slate-400">Follow these delivery guidelines to prevent inbox blocking and maintain high reputation.</span>
               </div>
-              <span class="text-[11px] text-slate-500 whitespace-nowrap" x-text="formatDate(log.sent_at)"></span>
             </div>
-          </template>
-          <div x-show="logs.length === 0" class="p-8 text-center text-slate-500 text-xs">
-            No activity logs found. Ready to dispatch campaigns!
+            <button type="button" @click="openGuide('deliverability')" class="text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1">
+              <span>Deliverability Guide</span> &rarr;
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] pt-1">
+            <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+              <div class="flex items-center gap-1.5 text-emerald-300 font-bold">
+                <span>Google Port 587 (TLS):</span>
+              </div>
+              <p class="text-slate-400">Use <code class="text-white">smtp.gmail.com</code> with Port <code class="text-white">587</code> and STARTTLS enabled. Never use unencrypted Port 25.</p>
+            </div>
+            <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+              <div class="flex items-center gap-1.5 text-amber-300 font-bold">
+                <span>Delay Interval (10–25s):</span>
+              </div>
+              <p class="text-slate-400">Setting delays between 10 and 25 seconds mimics human sending patterns and bypasses algorithmic rate limiters.</p>
+            </div>
+            <div class="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+              <div class="flex items-center gap-1.5 text-indigo-300 font-bold">
+                <span>Dry-Run Simulation:</span>
+              </div>
+              <p class="text-slate-400">Keep <strong class="text-amber-300">Dry-Run Simulation</strong> enabled to test templates, tags, and formatting safely before live customer delivery.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Safe Dry-Run Mode Toggle Banner -->
+        <div class="p-4 rounded-xl border flex items-center justify-between gap-4" :class="settings.dry_run_mode ? 'bg-amber-950/40 border-amber-800/60' : 'bg-emerald-950/40 border-emerald-800/60'">
+          <div>
+            <div class="text-xs font-bold" :class="settings.dry_run_mode ? 'text-amber-300' : 'text-emerald-300'">
+              <span x-text="settings.dry_run_mode ? '⚠️ DRY-RUN SIMULATION ACTIVE' : '🚀 LIVE EMAIL SENDING ACTIVE'"></span>
+            </div>
+            <p class="text-[11px] text-slate-300 mt-0.5">
+              <span x-text="settings.dry_run_mode ? 'In dry-run mode, all templates render and variables validate completely without dispatching real emails to customers.' : 'Real emails will be delivered directly to the recipients via your configured SMTP server.'"></span>
+            </p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" x-model="settings.dry_run_mode" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+          </label>
+        </div>
+
+        <form @submit.prevent="saveSettings()" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Host</label>
+              <input type="text" x-model="settings.smtp_host" placeholder="smtp.gmail.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Port</label>
+              <input type="number" x-model.number="settings.smtp_port" placeholder="587" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Username / Email</label>
+              <input type="text" x-model="settings.smtp_user" placeholder="your-email@gmail.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">SMTP Password / App Password</label>
+              <input type="password" x-model="settings.smtp_password" placeholder="••••••••••••••••" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Sender Display Name</label>
+              <input type="text" x-model="settings.sender_name" placeholder="Web Development Agency" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Sender From Email</label>
+              <input type="email" x-model="settings.sender_email" placeholder="outreach@yourdomain.com" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500" required>
+            </div>
+          </div>
+
+          <!-- Rate Limiting & Anti-Spam -->
+          <div class="p-4 bg-slate-900/60 rounded-lg border border-slate-800 space-y-3">
+            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="shield" class="w-4 h-4 text-blue-400"></i> Anti-Spam & Delivery Safeguards
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Daily Sending Limit</label>
+                <input type="number" x-model.number="settings.daily_limit" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Min Delay (seconds)</label>
+                <input type="number" x-model.number="settings.delay_min" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Max Delay (seconds)</label>
+                <input type="number" x-model.number="settings.delay_max" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+            <button type="button" @click="testConnection()" class="btn btn-secondary text-xs">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Test SMTP Connection
+            </button>
+            <button type="submit" class="btn btn-primary text-xs shadow-lg shadow-blue-500/20">
+              <i data-lucide="save" class="w-4 h-4"></i> Save Settings
+            </button>
+          </div>
+        </form>
+
+        <!-- Test Email Dispatch Tool -->
+        <div class="border-t border-slate-800 pt-5 space-y-3">
+          <h3 class="text-xs font-bold text-white flex items-center gap-2">
+            <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i> Send Immediate Test Email
+          </h3>
+          <div class="flex gap-2">
+            <input type="email" x-model="testEmailAddress" placeholder="Enter your email to receive a test dispatch..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500">
+            <button type="button" @click="sendTestEmail()" class="btn btn-success text-xs">
+              <i data-lucide="send" class="w-4 h-4"></i> Send Test
+            </button>
           </div>
         </div>
       </div>
@@ -504,126 +405,6 @@
 
 
   </main>
-
-  <!-- ================= QUICK SEND MODAL (1-Click Outreach) ================= -->
-  <div x-show="quickSendModalOpen" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" style="display: none;">
-    <div class="bg-[#131d31] border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div>
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i data-lucide="send" class="w-4 h-4 text-sky-400"></i>
-            1-Click Customer Outreach & Sequence Dispatch
-          </h3>
-          <p class="text-[11px] text-slate-400 mt-0.5">
-            Sending to: <strong class="text-white" x-text="quickSendLead?.contact_person || quickSendLead?.company_name"></strong> (<span class="font-mono text-sky-300" x-text="quickSendLead?.email"></span>)
-          </p>
-        </div>
-        <button @click="quickSendModalOpen = false" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
-      </div>
-
-      <!-- Quick Send Instructions Tip -->
-      <div class="p-3 bg-gradient-to-r from-sky-950/50 to-slate-900 border border-sky-500/30 rounded-xl text-xs space-y-1.5 text-slate-300">
-        <div class="flex items-center justify-between text-sky-300 font-bold">
-          <span class="flex items-center gap-1.5">
-            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-            How 1-Click Fast Outreach Works:
-          </span>
-          <span class="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full font-semibold">1-Click Dispatch</span>
-        </div>
-        <p class="text-[11px] text-slate-400 leading-relaxed">
-          1. Select one of the 4 proven B2C strategies below &bull; 2. Subject and personalized message are auto-generated &bull; 3. Click <strong class="text-white">Send Email Now</strong>: this customer is automatically added to your portfolio, a conversation opens in your Unified Inbox, and the email dispatches via your assigned Google Workspace SMTP account.
-        </p>
-      </div>
-
-      <!-- Quick Template Cards Selection (4 B2C choices) -->
-      <div>
-        <label class="block text-xs text-slate-300 font-medium mb-2">Choose Email Strategy / Template:</label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <div @click="selectQuickSendTemplate(1)"
-               class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5"
-               :class="quickSendTemplateId === 1 ? 'bg-amber-500/10 border-amber-500/80 shadow-md ring-1 ring-amber-500/30' : 'bg-slate-900 border-slate-800 hover:border-slate-700'">
-            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 text-base">👑</div>
-            <div class="min-w-0">
-              <span class="text-xs font-bold text-white block truncate">VIP Concierge Intro</span>
-              <span class="text-[10px] text-slate-400 block line-clamp-2">Direct personal host assignment & exclusive weekly reload perks.</span>
-            </div>
-          </div>
-
-          <div @click="selectQuickSendTemplate(2)"
-               class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5"
-               :class="quickSendTemplateId === 2 ? 'bg-emerald-500/10 border-emerald-500/80 shadow-md ring-1 ring-emerald-500/30' : 'bg-slate-900 border-slate-800 hover:border-slate-700'">
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0 text-base">🎁</div>
-            <div class="min-w-0">
-              <span class="text-xs font-bold text-white block truncate">Win-Back Bonus</span>
-              <span class="text-[10px] text-slate-400 block line-clamp-2">Special return perk and instant match reward for inactive customer.</span>
-            </div>
-          </div>
-
-          <div @click="selectQuickSendTemplate(3)"
-               class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5"
-               :class="quickSendTemplateId === 3 ? 'bg-purple-500/10 border-purple-500/80 shadow-md ring-1 ring-purple-500/30' : 'bg-slate-900 border-slate-800 hover:border-slate-700'">
-            <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0 text-base">⭐</div>
-            <div class="min-w-0">
-              <span class="text-xs font-bold text-white block truncate">VIP Tier Upgrade</span>
-              <span class="text-[10px] text-slate-400 block line-clamp-2">Celebration notice for VIP Gold upgrade with higher limits.</span>
-            </div>
-          </div>
-
-          <div @click="selectQuickSendTemplate(4)"
-               class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5"
-               :class="quickSendTemplateId === 4 ? 'bg-sky-500/10 border-sky-500/80 shadow-md ring-1 ring-sky-500/30' : 'bg-slate-900 border-slate-800 hover:border-slate-700'">
-            <div class="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-300 flex items-center justify-center shrink-0 text-base">💬</div>
-            <div class="min-w-0">
-              <span class="text-xs font-bold text-white block truncate">1-on-1 VIP Check-In</span>
-              <span class="text-[10px] text-slate-400 block line-clamp-2">Personal relationship check-in & quick customer satisfaction feedback.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Outbound Mailbox Selection -->
-      <div>
-        <label class="block text-xs text-slate-300 font-medium mb-1">Dispatching Account / Sender Mailbox:</label>
-        <select x-model="quickSendMailboxId" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-sky-500">
-          <template x-for="mb in mailboxes" :key="mb.id">
-            <option :value="mb.id" x-text="mb.name + ' — ' + (mb.sender_email || 'No email')"></option>
-          </template>
-        </select>
-      </div>
-
-      <!-- Subject line -->
-      <div>
-        <label class="block text-xs text-slate-300 font-medium mb-1">Subject Line</label>
-        <input type="text" x-model="quickSendSubject" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-sky-500">
-      </div>
-
-      <!-- Body -->
-      <div>
-        <label class="block text-xs text-slate-300 font-medium mb-1">Email Body (Rich HTML / Plain Text)</label>
-        <textarea x-model="quickSendBody" rows="7" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-sky-500"></textarea>
-      </div>
-
-      <!-- Footer Actions -->
-      <div class="flex items-center justify-between pt-3 border-t border-slate-800">
-        <div class="text-[11px] text-slate-400">
-          <template x-if="quickSendLead && !quickSendLead.assigned_agent_name">
-            <span class="text-emerald-400 flex items-center gap-1">
-              <i data-lucide="check" class="w-3.5 h-3.5"></i>
-              Sending will claim this lead to <strong x-text="activeAgent?.name || 'you'"></strong>
-            </span>
-          </template>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button type="button" @click="quickSendModalOpen = false" class="btn btn-secondary text-xs">Cancel</button>
-          <button type="button" @click="submitQuickSend()" :disabled="quickSendSending || !quickSendBody.trim()" class="btn btn-primary text-xs flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-500/20 disabled:opacity-50">
-            <i data-lucide="send" class="w-3.5 h-3.5"></i>
-            <span x-text="quickSendSending ? 'Dispatching...' : '🚀 Send Email Now'"></span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 
 
 

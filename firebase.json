@@ -1,4 +1,4 @@
-﻿{
+{
   "hosting": {
     "public": "email_server/static",
     "ignore": [
@@ -6,6 +6,7 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "cleanUrls": true,
     "rewrites": [
       {
         "source": "**",

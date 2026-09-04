@@ -1,6 +1,19 @@
-function app() {
+function app(initialTab = null) {
+  let detectedTab = initialTab;
+  if (!detectedTab && typeof window !== 'undefined') {
+    const p = (window.location.pathname || '').toLowerCase();
+    if (p.includes('customer')) detectedTab = 'leads';
+    else if (p.includes('inbox')) detectedTab = 'inbox';
+    else if (p.includes('campaign')) detectedTab = 'campaigns';
+    else if (p.includes('mailbox')) detectedTab = 'domains';
+    else if (p.includes('winback')) detectedTab = 'reengagement';
+    else if (p.includes('agent')) detectedTab = 'agents';
+    else if (p.includes('setting')) detectedTab = 'settings';
+    else if (p.includes('log')) detectedTab = 'logs';
+    else detectedTab = 'overview';
+  }
   return {
-    currentTab: 'overview',
+    currentTab: detectedTab || 'overview',
     stats: {
       total_leads_in_db: 0,
       leads_with_email: 0,
@@ -156,6 +169,32 @@ function app() {
 
       // Render icons immediately so login screen looks correct
       this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+
+      // Cross-page navigation handlers (URL query parameters & session data)
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('openCsv') === '1') {
+          this.csvModalOpen = true;
+        }
+        if (urlParams.get('filter') === 'unassigned') {
+          this.leadsFilter.assigned = 'unassigned';
+        }
+        if (urlParams.get('search')) {
+          this.leadsFilter.query = urlParams.get('search');
+        }
+
+        const storedLeads = sessionStorage.getItem('fivenights_campaign_leads');
+        if (storedLeads) {
+          try {
+            this.campaignForm.leads = JSON.parse(storedLeads);
+            const campName = sessionStorage.getItem('fivenights_campaign_name');
+            if (campName) this.campaignForm.name = campName;
+            sessionStorage.removeItem('fivenights_campaign_leads');
+            sessionStorage.removeItem('fivenights_campaign_name');
+            this.showToast(`Loaded ${this.campaignForm.leads.length} recipients into Campaign Builder`);
+          } catch (e) {}
+        }
+      }
 
       // Load backend data in background (only if API available)
       this.loadStats().catch(() => {});

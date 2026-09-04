@@ -591,5 +591,47 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
+@app.get("/overview")
+@app.get("/overview.html")
 async def serve_index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+@app.get("/customers")
+@app.get("/customers.html")
+async def serve_customers():
+    return FileResponse(os.path.join(STATIC_DIR, "customers.html"))
+
+@app.get("/inbox")
+@app.get("/inbox.html")
+async def serve_inbox():
+    return FileResponse(os.path.join(STATIC_DIR, "inbox.html"))
+
+@app.get("/campaigns")
+@app.get("/campaigns.html")
+async def serve_campaigns():
+    return FileResponse(os.path.join(STATIC_DIR, "campaigns.html"))
+
+@app.get("/mailboxes")
+@app.get("/mailboxes.html")
+async def serve_mailboxes():
+    return FileResponse(os.path.join(STATIC_DIR, "mailboxes.html"))
+
+@app.get("/winback")
+@app.get("/winback.html")
+async def serve_winback():
+    return FileResponse(os.path.join(STATIC_DIR, "winback.html"))
+
+@app.get("/agents")
+@app.get("/agents.html")
+async def serve_agents():
+    return FileResponse(os.path.join(STATIC_DIR, "agents.html"))
+
+@app.get("/settings")
+@app.get("/settings.html")
+async def serve_settings():
+    return FileResponse(os.path.join(STATIC_DIR, "settings.html"))
+
+@app.get("/logs")
+@app.get("/logs.html")
+async def serve_logs():
+    return FileResponse(os.path.join(STATIC_DIR, "logs.html"))
